@@ -16,5 +16,16 @@
         "abort": {
             "single_instance_allowed": "Une seule instance est autorisée."
         }
+    },
+    "entity": {
+        "sensor": {
+            "health": {
+                "name": "État du système",
+                "state": {
+                    "ok": "Fonctionnel",
+                    "error": "Erreur"
+                }
+            }
+        }
     }
 }
