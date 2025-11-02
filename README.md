@@ -1,38 +1,62 @@
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+# Intégration Aldes pour Home Assistant
 
-October 2024: archived in favor of a local DIY solution: https://github.com/guix77/esphome-aldes-tone
-
-# Aldes integration for Home Assistant
-
-This integration allows Home Assistant to interact with an Aldes product through the cloud. You must have an AldesConnect box connected to the device, set up and working in the mobile app.
-
-## Supported products
-
-### T.One® AIR
-
-+ Binary sensor entity to check if the product is connected to Aldes cloud
-+ Temperature sensor entity for each room
-+ Climate entity for each room with a thermostat to set the target temperature, and a global mode switch between OFF, HEAT and COOL.
-
-### Other products
-
-+ T.One® AquaAIR: the air part could work (to be confirmed) but there's no water implementation.
+Cette intégration permet de contrôler votre système Aldes depuis Home Assistant.
 
 ## Installation
 
-In HACS, add the custom repository https://github.com/guix77/homeassistant-aldes and select the Integration category.
+1. Copiez le dossier `custom_components/aldes` dans le dossier `custom_components` de votre installation Home Assistant
+2. Redémarrez Home Assistant
+3. Allez dans Configuration > Intégrations
+4. Cliquez sur "Ajouter une intégration"
+5. Recherchez "Aldes"
+6. Entrez vos identifiants Aldes (email et mot de passe)
+
+## Fonctionnalités
+
+- Contrôle des thermostats
+- Affichage des températures actuelles
+- Réglage des températures de consigne
+- Mode air et eau
+- Quantité d'eau chaude
+- État de connexion
+
+## Entités créées
+
+L'intégration crée plusieurs entités dans Home Assistant :
+
+### Thermostats
+- Une entité climate pour chaque thermostat
+- Température actuelle
+- Température de consigne
+- Mode de fonctionnement
+
+### Capteurs
+- Mode air actuel
+- Mode eau actuel
+- Température principale
+- Quantité d'eau chaude
+- État de connexion
 
 ## Configuration
 
-The username and password asked during the configuration are the same that you use for the Aldes mobile app.
+La configuration se fait entièrement via l'interface utilisateur de Home Assistant. Aucune configuration manuelle n'est nécessaire.
 
-## Credits
+### Options de configuration
 
-- [API doc](https://community.jeedom.com/t/aldes-connect-api/57068)
-- [API auth & call examples](https://github.com/aalmazanarbs/hassio_aldes)
-- [More API doc](https://community.jeedom.com/t/aldes-t-one-api-php/94269)
-- [Integration blueprint](https://github.com/custom-components/integration_blueprint)
+- **Username** : Votre adresse email Aldes
+- **Password** : Votre mot de passe Aldes
 
-## See also
+## Dépannage
 
-- https://github.com/Fredzxda/homeassistant-aldes for EASYHOME PureAir Compact CONNECT
+En cas de problème de connexion :
+1. Vérifiez vos identifiants
+2. Assurez-vous que vous pouvez vous connecter à l'application Aldes
+3. Vérifiez les logs de Home Assistant pour plus de détails
+
+## API Test
+
+Un script de test de l'API est fourni pour vérifier votre connexion :
+
+```bash
+python scripts/test_api.py votre_email votre_mot_de_passe
+```

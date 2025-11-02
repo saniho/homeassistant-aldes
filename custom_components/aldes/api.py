@@ -1,17 +1,33 @@
 """Aldes API Client."""
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import asyncio
 import logging
 from datetime import datetime, timedelta
 import backoff
 import aiohttp
 from aiohttp import ClientError, ClientTimeout
+from urllib.parse import urlencode
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class AuthenticationException(Exception):
     """Authentication exception."""
+    def __init__(self, message="Échec de l'authentification", status=None, response=None):
+        self.message = message
+        self.status = status
+        self.response = response
+        super().__init__(self.message)
+
+
+class AuthResponse:
+    """Réponse d'authentification."""
+    def __init__(self, json_response: Dict[str, Any]):
+        self.access_token = json_response.get("access_token")
+        self.token_type = json_response.get("token_type")
+        self.expires_in = json_response.get("expires_in")
+        self.scope = json_response.get("scope")
+        self.needUpdate = json_response.get("needUpdate")
 
 
 class AldesApi:
@@ -44,32 +60,75 @@ class AldesApi:
         max_tries=_MAX_RETRIES,
         max_time=60
     )
-    async def authenticate(self) -> None:
+    async def authenticate(self) -> AuthResponse:
         """Get an access token with retry."""
-        data: Dict = {
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+            'User-Agent': 'AldesHomeAssistant/1.0'
+        }
+
+        # Données d'authentification simplifiées
+        data = {
             "grant_type": "password",
             "username": self._username,
             "password": self._password,
         }
 
         try:
+            _LOGGER.debug("Tentative d'authentification à %s avec les données: %s",
+                         self._API_URL_TOKEN,
+                         {k: '***' if k == 'password' else v for k, v in data.items()})
+
             async with self._session.post(
                 self._API_URL_TOKEN,
-                data=data,
-                timeout=self._timeout
+                data=data,  # Les données sont envoyées directement, aiohttp gère l'encodage
+                headers=headers,
+                timeout=self._timeout,
+                ssl=True
             ) as response:
+                response_text = await response.text()
+                _LOGGER.debug("Réponse reçue (status: %s): %s", response.status, response_text)
+
                 if response.status == 200:
-                    json_response = await response.json()
-                    self._token = json_response["access_token"]
-                    expires_in = json_response.get("expires_in", 3600)
-                    self._token_expires_at = datetime.now() + timedelta(seconds=expires_in)
-                    _LOGGER.debug("Authentication successful")
+                    try:
+                        json_response = await response.json()
+                        auth_response = AuthResponse(json_response)
+
+                        self._token = auth_response.access_token
+                        self._token_expires_at = datetime.now() + timedelta(seconds=auth_response.expires_in or 3600)
+
+                        _LOGGER.debug("Authentification réussie, token valide pour %s secondes", auth_response.expires_in)
+
+                        # Logging du message de mise à jour si présent
+                        if auth_response.needUpdate:
+                            _LOGGER.warning("Message de mise à jour disponible: %s",
+                                          auth_response.needUpdate.get("message"))
+
+                        return auth_response
+
+                    except (KeyError, ValueError) as e:
+                        raise AuthenticationException(f"Réponse invalide: {str(e)}", response.status, response_text)
                 else:
-                    _LOGGER.error("Authentication failed: %s", response.status)
-                    raise AuthenticationException()
+                    error_details = ""
+                    try:
+                        error_json = await response.json()
+                        error_details = f" - {error_json.get('error_description', '')}"
+                    except:
+                        pass
+
+                    raise AuthenticationException(
+                        f"Échec de l'authentification (status: {response.status}){error_details}",
+                        response.status,
+                        response_text
+                    )
+
+        except asyncio.TimeoutError as e:
+            raise AuthenticationException(f"Timeout lors de l'authentification: {str(e)}")
+        except ClientError as e:
+            raise AuthenticationException(f"Erreur réseau lors de l'authentification: {str(e)}")
         except Exception as e:
-            _LOGGER.error("Authentication error: %s", str(e))
-            raise
+            raise AuthenticationException(f"Erreur inattendue lors de l'authentification: {str(e)}")
 
     async def _get_cached_data(self, cache_key: str) -> Any:
         """Get cached data if valid."""
