@@ -7,6 +7,7 @@ import backoff
 import aiohttp
 from aiohttp import ClientError, ClientTimeout
 from urllib.parse import urlencode
+import json
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,7 +28,6 @@ class AuthResponse:
         self.token_type = json_response.get("token_type")
         self.expires_in = json_response.get("expires_in")
         self.scope = json_response.get("scope")
-        self.needUpdate = json_response.get("needUpdate")
 
 
 class AldesApi:
@@ -36,9 +36,11 @@ class AldesApi:
     _API_URL_TOKEN = "https://aldesiotsuite-aldeswebapi.azurewebsites.net/oauth2/token"
     _API_URL_PRODUCTS = "https://aldesiotsuite-aldeswebapi.azurewebsites.net/aldesoc/v5/users/me/products"
     _AUTHORIZATION_HEADER_KEY = "Authorization"
+    _API_KEY_HEADER = "apikey"
     _TOKEN_TYPE = "Bearer"
     _REQUEST_TIMEOUT = 30
     _MAX_RETRIES = 3
+    _API_KEY = "XQibgk1ozo1wjVQcvcoFQqMl3pjEwcRv"  # API key fixe
 
     def __init__(
         self, username: str, password: str, session: aiohttp.ClientSession
@@ -53,6 +55,19 @@ class AldesApi:
         self._cache = {}
         self._cache_timestamp = {}
         self._cache_ttl = timedelta(minutes=5)
+        self._user_agent = "AldesConnect/2.0.0"
+
+    def _log_request_details(self, method: str, url: str, headers: Dict, data: Dict = None) -> None:
+        """Log request details for debugging."""
+        _LOGGER.debug("=== Détails de la requête ===")
+        _LOGGER.debug("Méthode: %s", method)
+        _LOGGER.debug("URL: %s", url)
+        _LOGGER.debug("Headers: %s", {k: v for k, v in headers.items() if k.lower() != 'authorization'})
+        if data:
+            safe_data = data.copy()
+            if 'password' in safe_data:
+                safe_data['password'] = '***'
+            _LOGGER.debug("Data: %s", safe_data)
 
     @backoff.on_exception(
         backoff.expo,
@@ -65,48 +80,41 @@ class AldesApi:
         headers = {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Accept': 'application/json',
-            'User-Agent': 'AldesHomeAssistant/1.0'
+            'User-Agent': self._user_agent,
+            self._API_KEY_HEADER: self._API_KEY
         }
 
-        # Données d'authentification simplifiées
         data = {
             "grant_type": "password",
             "username": self._username,
             "password": self._password,
+            "scope": "openid profile email offline_access"
         }
 
-        try:
-            _LOGGER.debug("Tentative d'authentification à %s avec les données: %s",
-                         self._API_URL_TOKEN,
-                         {k: '***' if k == 'password' else v for k, v in data.items()})
+        self._log_request_details("POST", self._API_URL_TOKEN, headers, data)
 
+        try:
             async with self._session.post(
                 self._API_URL_TOKEN,
-                data=data,  # Les données sont envoyées directement, aiohttp gère l'encodage
+                data=data,
                 headers=headers,
                 timeout=self._timeout,
                 ssl=True
             ) as response:
                 response_text = await response.text()
-                _LOGGER.debug("Réponse reçue (status: %s): %s", response.status, response_text)
+                _LOGGER.debug("=== Détails de la réponse ===")
+                _LOGGER.debug("Status: %s", response.status)
+                _LOGGER.debug("Headers: %s", dict(response.headers))
+                _LOGGER.debug("Body: %s", response_text)
 
                 if response.status == 200:
                     try:
                         json_response = await response.json()
                         auth_response = AuthResponse(json_response)
-
                         self._token = auth_response.access_token
                         self._token_expires_at = datetime.now() + timedelta(seconds=auth_response.expires_in or 3600)
-
-                        _LOGGER.debug("Authentification réussie, token valide pour %s secondes", auth_response.expires_in)
-
-                        # Logging du message de mise à jour si présent
-                        if auth_response.needUpdate:
-                            _LOGGER.warning("Message de mise à jour disponible: %s",
-                                          auth_response.needUpdate.get("message"))
-
+                        _LOGGER.info("Authentification réussie")
                         return auth_response
-
                     except (KeyError, ValueError) as e:
                         raise AuthenticationException(f"Réponse invalide: {str(e)}", response.status, response_text)
                 else:
@@ -123,12 +131,9 @@ class AldesApi:
                         response_text
                     )
 
-        except asyncio.TimeoutError as e:
-            raise AuthenticationException(f"Timeout lors de l'authentification: {str(e)}")
-        except ClientError as e:
-            raise AuthenticationException(f"Erreur réseau lors de l'authentification: {str(e)}")
         except Exception as e:
-            raise AuthenticationException(f"Erreur inattendue lors de l'authentification: {str(e)}")
+            _LOGGER.error("Erreur lors de l'authentification: %s", str(e))
+            raise
 
     async def _get_cached_data(self, cache_key: str) -> Any:
         """Get cached data if valid."""
@@ -204,18 +209,19 @@ class AldesApi:
             await self.authenticate()
 
         try:
-            response = await request(
-                url,
-                headers={self._AUTHORIZATION_HEADER_KEY: self._build_authorization()},
-                **kwargs
-            )
+            headers = {
+                self._AUTHORIZATION_HEADER_KEY: self._build_authorization(),
+                self._API_KEY_HEADER: self._API_KEY  # Ajout de l'API key dans tous les appels
+            }
+            if 'headers' in kwargs:
+                headers.update(kwargs['headers'])
+            kwargs['headers'] = headers
+
+            response = await request(url, **kwargs)
+
             if response.status == 401:
                 await self.authenticate()
-                response = await request(
-                    url,
-                    headers={self._AUTHORIZATION_HEADER_KEY: self._build_authorization()},
-                    **kwargs
-                )
+                response = await request(url, **kwargs)
             return response
         except Exception as e:
             _LOGGER.error("Request error: %s", str(e))
