@@ -9,7 +9,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, UnitOfTemperature, PEOPLE
+from homeassistant.const import PERCENTAGE, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -175,8 +175,7 @@ class AldesSettingsSensor(AldesEntity, SensorEntity):
         )
         self._attr_unique_id = f"{DOMAIN}_{modem_id}_settings"
         self._attr_name = "Aldes Settings"
-        self._attr_icon = "mdi:cog"
-        self._attr_native_unit_of_measurement = PEOPLE
+        self._attr_icon = "mdi:account-group"
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
@@ -211,7 +210,16 @@ class AldesSettingsSensor(AldesEntity, SensorEntity):
             and product_data.get("indicator")
             and "settings" in product_data["indicator"]
         ):
-            self._attr_native_value = product_data["indicator"]["settings"].get("people")
+            people = product_data["indicator"]["settings"].get("people")
+            if people is not None:
+                try:
+                    # Add 2 to the value from the API
+                    self._attr_native_value = int(people) + 2
+                except (ValueError, TypeError):
+                    # If for some reason it's not a number, just show the original value
+                    self._attr_native_value = people
+            else:
+                self._attr_native_value = None
         else:
             self._attr_native_value = None
         

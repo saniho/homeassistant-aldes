@@ -4,143 +4,79 @@ import asyncio
 import aiohttp
 import logging
 import argparse
-import sys
 import os
-from datetime import datetime
-from pathlib import Path
+import sys
 
-# Configuration du logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Add the project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
+from custom_components.aldes.api import AldesApi
+
+# Setup basic logging
+logging.basicConfig(level=logging.INFO)
 _LOGGER = logging.getLogger(__name__)
-
-def setup_import_path():
-    """Configure le PYTHONPATH pour l'importation des modules."""
-    current_file = Path(__file__).resolve()
-    project_root = current_file.parent.parent
-    _LOGGER.debug(f"Ajout du chemin au PYTHONPATH: {project_root}")
-    sys.path.insert(0, str(project_root))
-
-try:
-    setup_import_path()
-    from custom_components.aldes.api import AldesApi, AuthenticationException
-except ImportError as e:
-    _LOGGER.error(f"Erreur d'importation: {e}")
-    _LOGGER.debug(f"PYTHONPATH actuel: {sys.path}")
-    _LOGGER.debug(f"Répertoire courant: {os.getcwd()}")
-    sys.exit(1)
 
 async def test_api(username: str, password: str):
     """Teste les fonctionnalités principales de l'API."""
     _LOGGER.info("Démarrage des tests de l'API Aldes")
     _LOGGER.debug(f"Test avec l'utilisateur: {username}")
 
-    # Configuration du client HTTP avec des headers personnalisés
-    timeout = aiohttp.ClientTimeout(total=30)
-    headers = {
-        'User-Agent': 'AldesHomeAssistant/1.0',
-        'Accept': 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded'
-    }
-
-    async with aiohttp.ClientSession(headers=headers, timeout=timeout) as session:
+    async with aiohttp.ClientSession() as session:
+        # The API key is handled inside the AldesApi class now
         api = AldesApi(username, password, session)
 
         try:
+            # Test authentication
             _LOGGER.info("Test d'authentification...")
-            _LOGGER.debug("Tentative d'authentification à l'API Aldes...")
+            await api.authenticate()
+            _LOGGER.info("\033[92m✓ Authentification réussie\033[0m")
 
-            try:
-                auth_response = await api.authenticate()
-                _LOGGER.info("✓ Authentification réussie")
+            # Test data fetching
+            _LOGGER.info("\nRécupération des données...")
+            data = await api.fetch_data()
+            _LOGGER.info(f"\033[92m✓ Données récupérées: {len(data)} produits trouvés\033[0m")
+            _LOGGER.info(f"\033[92m✓ Données JSON récupérées: {data} \033[0m")
 
-                # Vérification du message de mise à jour
-                if hasattr(auth_response, 'needUpdate') and auth_response.needUpdate:
-                    update_info = auth_response.needUpdate
-                    _LOGGER.warning("\nMessage de mise à jour détecté:")
-                    _LOGGER.warning(f"  Message: {update_info.get('message', 'N/A')}")
-                    _LOGGER.warning(f"  Store Android: {update_info.get('storeAndroid', 'N/A')}")
-                    _LOGGER.warning(f"  Store Apple: {update_info.get('storeApple', 'N/A')}")
+            # Display data for each product
+            for product in data:
+                _LOGGER.info("\n[1mDétails du produit:[0m")
+                _LOGGER.info(f"  ID: {product.get('modem', 'N/A')}")
+                _LOGGER.info(f"  Type: {product.get('type', 'N/A')}")
+                _LOGGER.info(f"  Nom: {product.get('name', 'N/A')}")
+                _LOGGER.info(f"  Référence: {product.get('reference', 'N/A')}")
+                _LOGGER.info(f"  Numéro de série: {product.get('serial_number', 'N/A')}")
+                _LOGGER.info(f"  Connecté: {product.get('isConnected')}")
 
-            except AuthenticationException as auth_err:
-                _LOGGER.error("❌ Échec de l'authentification")
-                _LOGGER.debug(f"Détails de l'erreur d'authentification: {auth_err}")
-                return
-            except Exception as e:
-                _LOGGER.error(f"❌ Erreur inattendue lors de l'authentification: {e}")
-                _LOGGER.debug(f"Type d'erreur: {type(e)}")
-                return
+                indicator = product.get("indicator", {})
+                if indicator:
+                    _LOGGER.info("\n  [4mInformations générales:[0m")
+                    _LOGGER.info(f"    Mode air actuel: {indicator.get('current_air_mode', 'N/A')}")
+                    _LOGGER.info(f"    Mode eau actuel: {indicator.get('current_water_mode', 'N/A')}")
+                    _LOGGER.info(f"    Température principale: {indicator.get('tmp_principal', 'N/A')}°C")
+                    _LOGGER.info(f"    Quantité d'eau chaude: {indicator.get('qte_eau_chaude', 'N/A')}%")
 
-            _LOGGER.info("Récupération des données...")
-            try:
-                data = await api.fetch_data()
-                _LOGGER.debug(f"Données brutes reçues: {data}")
+                settings = indicator.get("settings")
+                if settings:
+                    _LOGGER.info("\n  [4mParamètres:[0m")
+                    _LOGGER.info(f"    Nombre de personnes: {settings.get('people', 'N/A')}")
 
-                if not data:
-                    _LOGGER.warning("Aucune donnée n'a été récupérée")
-                    return
+                thermostats = indicator.get("thermostats", [])
+                if thermostats:
+                    _LOGGER.info("\n  [4mThermostats:[0m")
+                    for thermostat in thermostats:
+                        thermostat_name = thermostat.get("Name") or f"Thermostat {thermostat.get('Number')}"
+                        _LOGGER.info(f"    - {thermostat_name}:")
+                        _LOGGER.info(f"      ID: {thermostat.get('ThermostatId', 'N/A')}")
+                        _LOGGER.info(f"      Température actuelle: {thermostat.get('CurrentTemperature', 'N/A')}°C")
+                        _LOGGER.info(f"      Température de consigne: {thermostat.get('TemperatureSet', 'N/A')}°C")
 
-                if not isinstance(data, list):
-                    _LOGGER.info("Conversion des données en liste")
-                    data = [data] if data else []
-
-                _LOGGER.info(f"✓ Données récupérées: {len(data)} produits trouvés")
-
-                for product in data:
-                    if not isinstance(product, dict):
-                        _LOGGER.warning(f"Produit invalide ignoré: {product}")
-                        continue
-
-                    _LOGGER.info("\nDétails du produit:")
-                    _LOGGER.info(f"  ID: {product.get('modem', 'N/A')}")
-                    _LOGGER.info(f"  Type: {product.get('type', 'N/A')}")
-                    _LOGGER.info(f"  Nom: {product.get('name', 'N/A')}")
-                    _LOGGER.info(f"  Référence: {product.get('reference', 'N/A')}")
-                    _LOGGER.info(f"  Numéro de série: {product.get('serial_number', 'N/A')}")
-                    _LOGGER.info(f"  Connecté: {product.get('isConnected', False)}")
-
-                    # Accès aux données de l'indicateur
-                    indicator = product.get('indicator', {})
-                    if indicator:
-                        _LOGGER.info("\n  Informations générales:")
-                        _LOGGER.info(f"    Mode air actuel: {indicator.get('current_air_mode', 'N/A')}")
-                        _LOGGER.info(f"    Mode eau actuel: {indicator.get('current_water_mode', 'N/A')}")
-                        _LOGGER.info(f"    Température principale: {indicator.get('tmp_principal', 'N/A')}°C")
-                        _LOGGER.info(f"    Quantité d'eau chaude: {indicator.get('qte_eau_chaude', 'N/A')}%")
-
-                        # Lecture des thermostats depuis l'indicateur
-                        thermostats = indicator.get('thermostats', [])
-                        if thermostats:
-                            _LOGGER.info("\n  Thermostats:")
-                            for thermostat in thermostats:
-                                name = thermostat.get('Name', '').strip() or f"Thermostat {thermostat.get('Number', 'N/A')}"
-                                _LOGGER.info(f"    - {name}:")
-                                _LOGGER.info(f"      ID: {thermostat.get('ThermostatId', 'N/A')}")
-                                _LOGGER.info(f"      Température actuelle: {thermostat.get('CurrentTemperature', 'N/A')}°C")
-                                _LOGGER.info(f"      Température de consigne: {thermostat.get('TemperatureSet', 'N/A')}°C")
-                        else:
-                            _LOGGER.info("  Aucun thermostat trouvé dans l'indicateur")
-                    else:
-                        _LOGGER.info("  Aucune donnée d'indicateur trouvée")
-
-            except Exception as e:
-                _LOGGER.error(f"Erreur lors de la récupération des données: {e}")
-                _LOGGER.debug(f"Type d'erreur: {type(e)}")
-                _LOGGER.debug(f"Détails de l'erreur: {str(e)}")
-                return
-
-        except aiohttp.ClientError as e:
-            _LOGGER.error(f"Erreur réseau: {e}")
-            _LOGGER.debug(f"Détails de l'erreur réseau: {str(e)}")
-            raise
         except Exception as e:
-            _LOGGER.error(f"Erreur inattendue: {e}")
-            _LOGGER.debug(f"Type d'erreur: {type(e)}")
-            raise
+            _LOGGER.error(f"\033[91m❌ Erreur lors des tests: {str(e)}\033[0m")
+            # Optionally re-raise to see the full stack trace
+            # raise
         else:
-            _LOGGER.info("\n✓ Tests terminés avec succès!")
+            _LOGGER.info("\n\033[92m✓ Tests terminés avec succès!\033[0m")
 
 def main():
     """Point d'entrée principal."""
@@ -152,12 +88,13 @@ def main():
 
     try:
         asyncio.run(test_api(args.username, args.password))
-    except KeyboardInterrupt:
-        _LOGGER.info("\nTests interrompus par l'utilisateur")
-    except Exception as e:
-        _LOGGER.error(f"Erreur lors de l'exécution des tests: {e}")
-        _LOGGER.debug(f"Type d'erreur: {type(e)}")
-        sys.exit(1)
+    except RuntimeError as e:
+        # In Windows, the event loop might be closed before all transports are cleaned up.
+        # This is a known issue and can be safely ignored if it happens at exit.
+        if "Event loop is closed" in str(e):
+            pass
+        else:
+            raise
 
 if __name__ == "__main__":
     main()
