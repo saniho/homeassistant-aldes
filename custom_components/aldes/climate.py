@@ -7,12 +7,16 @@ from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
     HVACMode,
+    HVACAction,
 )
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from .const import DOMAIN
 from .entity import AldesEntity
 
+# Temperature range for the device
+MIN_TEMP = 16.0
+MAX_TEMP = 31.0
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -90,14 +94,37 @@ class AldesClimateEntity(AldesEntity, ClimateEntity):
             return None
 
     @property
+    def hvac_action(self) -> HVACAction | None:
+        """
+        Retourne l'action CVC actuelle.
+        C'est ici que vous interrogez l'état réel de l'appareil physique.
+        """
+
+        for product in self.coordinator.data:
+            if product["serial_number"] == self.product_serial_number:
+                if product["indicator"]["current_air_mode"] in ["A"]:
+                    return HVACAction.OFF
+                if product["indicator"]["current_air_mode"] in ["B", "C"]:
+                    return HVACAction.HEATING
+                if product["indicator"]["current_air_mode"] in ["F", "G"]:
+                    return HVACAction.COOLING
+                if product["indicator"]["current_air_mode"] in ["D", "E", "H", "I"]:
+                    return HVACAction.IDLE
+
+        # Par défaut, si le mode est activé mais aucune action requise
+        return HVACAction.IDLE
+
+    @property
     def min_temp(self):
         """Get the minimum temperature"""
         for product in self.coordinator.data:
             if product["serial_number"] == self.product_serial_number:
                 if product["indicator"]["current_air_mode"] == "B":
                     return product["indicator"]["cmist"]
-                if product["indicator"]["current_air_mode"] == "F":
+                elif product["indicator"]["current_air_mode"] == "F":
                     return product["indicator"]["fmist"]
+                else:
+                    return MIN_TEMP
             return None
 
     @property
@@ -107,9 +134,19 @@ class AldesClimateEntity(AldesEntity, ClimateEntity):
             if product["serial_number"] == self.product_serial_number:
                 if product["indicator"]["current_air_mode"] == "B":
                     return product["indicator"]["cmast"]
-                if product["indicator"]["current_air_mode"] == "F":
+                elif product["indicator"]["current_air_mode"] == "F":
                     return product["indicator"]["fmast"]
+                else:
+                    return MAX_TEMP
             return None
+
+    @property
+    def precision(self):
+        """
+        Définit le pas (step) de température pour l'interface utilisateur.
+        """
+        # Définit le pas à 1.0 °C/°F
+        return 1.0
 
     @callback
     def _handle_coordinator_update(self) -> None:
