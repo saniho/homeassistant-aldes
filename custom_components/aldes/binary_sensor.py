@@ -1,12 +1,19 @@
 """Support for the Aldes binary sensors."""
 from __future__ import annotations
-from homeassistant.core import HomeAssistant, callback
+import logging
+
+from homeassistant.components.binary_sensor import (
+    BinarySensorDeviceClass,
+    BinarySensorEntity,
+)
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.entity import DeviceInfo
-from .const import DOMAIN, MANUFACTURER, FRIENDLY_NAMES
+
+from .const import DOMAIN
 from .entity import AldesEntity
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
@@ -14,60 +21,72 @@ async def async_setup_entry(
 ) -> None:
     """Add Aldes binary sensors from a config_entry."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
+    _LOGGER.debug("Starting binary sensor setup")
 
-    binary_sensors: list[AldesBinarySensorEntity] = []
-
+    binary_sensors: list[BinarySensorEntity] = []
     for product in coordinator.data:
-        binary_sensors.append(
-            AldesBinarySensorEntity(
-                coordinator,
-                entry,
-                product["serial_number"],
-                product["reference"],
-                product["modem"],
-            )
-        )
+        modem_id = product.get("modem")
+        # Prevent creation of entities with invalid ID
+        if not modem_id or modem_id == "N/A":
+            _LOGGER.warning("Skipping product with invalid modem ID: %s", modem_id)
+            continue
+
+        _LOGGER.debug(f"Creating connectivity sensor for {modem_id}")
+        binary_sensors.append(AldesConnectivitySensor(coordinator, entry, modem_id, product))
 
     async_add_entities(binary_sensors)
 
 
-class AldesBinarySensorEntity(AldesEntity, BinarySensorEntity):
-    """Define an Aldes binary sensor."""
+class AldesConnectivitySensor(AldesEntity, BinarySensorEntity):
+    """Represents the connectivity status of an Aldes product."""
 
-    _attr_device_class = "connectivity"
+    def __init__(
+        self,
+        coordinator,
+        config_entry,
+        modem_id,
+        product,
+    ):
+        """Initialize the sensor."""
+        super().__init__(
+            coordinator,
+            config_entry,
+            modem_id,
+            product.get("reference"),
+            modem_id,
+        )
+        self._attr_unique_id = f"{DOMAIN}_{modem_id}_connectivity"
+        self._attr_name = "Aldes Connection Status"
+        self._attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
 
     @property
-    def device_info(self):
-        """Return the device info."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.product_serial_number)},
-            manufacturer=MANUFACTURER,
-            name=f"{FRIENDLY_NAMES[self.reference]} {self.product_serial_number}",
-            model=FRIENDLY_NAMES[self.reference],
+    def extra_state_attributes(self):
+        """Return the state attributes."""
+        attributes = super().extra_state_attributes or {}
+        product_data = next(
+            (p for p in self.coordinator.data if p.get("modem") == self.modem),
+            None,
         )
 
-    @property
-    def unique_id(self):
-        """Return a unique ID to use for this entity."""
-        return f"{DOMAIN}_{self.product_serial_number}_connectivity"
-
-    @property
-    def name(self):
-        """Return a name to use for this entity."""
-        return f"{MANUFACTURER} {self.product_serial_number} connectivity"
+        if product_data:
+            attributes["product_type"] = product_data.get("type")
+            attributes["product_reference"] = product_data.get("reference")
+            attributes["latitude"] = product_data.get("gpsLatitude")
+            attributes["longitude"] = product_data.get("gpsLongitude")
+        
+        return attributes
 
     @callback
     def _handle_coordinator_update(self) -> None:
-        """Update attributes when the coordinator updates."""
-        self._async_update_attrs()
+        """Handle updated data from the coordinator."""
+        product_data = next(
+            (p for p in self.coordinator.data if p.get("modem") == self.modem),
+            None,
+        )
+        
+        if product_data:
+            self._attr_is_on = product_data.get("isConnected", False)
+        else:
+            self._attr_is_on = False
+        
         super()._handle_coordinator_update()
-
-    @callback
-    def _async_update_attrs(self) -> None:
-        """Update binary sensor attributes."""
-        for product in self.coordinator.data:
-            if product["serial_number"] == self.product_serial_number:
-                if product["isConnected"]:
-                    self._attr_is_on = True
-                else:
-                    self._attr_is_on = False

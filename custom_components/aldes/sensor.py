@@ -58,8 +58,9 @@ async def async_setup_entry(
     sensors: list[SensorEntity] = []
     for product in coordinator.data:
         modem_id = product.get("modem")
-        if not modem_id:
-            _LOGGER.warning("Skipping product with no modem ID: %s", product)
+        # Prevent creation of entities with invalid ID
+        if not modem_id or modem_id == "N/A":
+            _LOGGER.warning("Skipping product with invalid modem ID: %s", modem_id)
             continue
 
         _LOGGER.debug(f"Setting up sensors for product with modem ID: {modem_id}")

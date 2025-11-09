@@ -36,7 +36,6 @@ async def test_api(username: str, password: str):
             _LOGGER.info("\nRécupération des données...")
             data = await api.fetch_data()
             _LOGGER.info(f"\033[92m✓ Données récupérées: {len(data)} produits trouvés\033[0m")
-            _LOGGER.info(f"\033[92m✓ Données JSON récupérées: {data} \033[0m")
 
             # Display data for each product
             for product in data:
@@ -45,8 +44,12 @@ async def test_api(username: str, password: str):
                 _LOGGER.info(f"  Type: {product.get('type', 'N/A')}")
                 _LOGGER.info(f"  Nom: {product.get('name', 'N/A')}")
                 _LOGGER.info(f"  Référence: {product.get('reference', 'N/A')}")
-                _LOGGER.info(f"  Numéro de série: {product.get('serial_number', 'N/A')}")
-                _LOGGER.info(f"  Connecté: {product.get('isConnected')}")
+
+                # Display connection status and last update date
+                is_connected = product.get('isConnected')
+                connection_status = "\033[92mConnecté\033[0m" if is_connected else "\033[91mDéconnecté\033[0m"
+                _LOGGER.info(f"  Statut: {connection_status}")
+                _LOGGER.info(f"  Dernière mise à jour des données: {product.get('lastUpdatedDate', 'N/A')}")
 
                 indicator = product.get("indicator", {})
                 if indicator:
@@ -56,20 +59,20 @@ async def test_api(username: str, password: str):
                     _LOGGER.info(f"    Température principale: {indicator.get('tmp_principal', 'N/A')}°C")
                     _LOGGER.info(f"    Quantité d'eau chaude: {indicator.get('qte_eau_chaude', 'N/A')}%")
 
-                settings = indicator.get("settings")
-                if settings:
-                    _LOGGER.info("\n  [4mParamètres:[0m")
-                    _LOGGER.info(f"    Nombre de personnes: {settings.get('people', 'N/A')}")
+                    settings = indicator.get("settings")
+                    if settings:
+                        _LOGGER.info("\n  [4mParamètres:[0m")
+                        _LOGGER.info(f"    Nombre de personnes: {settings.get('people', 'N/A')}")
 
-                thermostats = indicator.get("thermostats", [])
-                if thermostats:
-                    _LOGGER.info("\n  [4mThermostats:[0m")
-                    for thermostat in thermostats:
-                        thermostat_name = thermostat.get("Name") or f"Thermostat {thermostat.get('Number')}"
-                        _LOGGER.info(f"    - {thermostat_name}:")
-                        _LOGGER.info(f"      ID: {thermostat.get('ThermostatId', 'N/A')}")
-                        _LOGGER.info(f"      Température actuelle: {thermostat.get('CurrentTemperature', 'N/A')}°C")
-                        _LOGGER.info(f"      Température de consigne: {thermostat.get('TemperatureSet', 'N/A')}°C")
+                    thermostats = indicator.get("thermostats", [])
+                    if thermostats:
+                        _LOGGER.info("\n  [4mThermostats:[0m")
+                        for thermostat in thermostats:
+                            thermostat_name = thermostat.get("Name") or f"Thermostat {thermostat.get('Number')}"
+                            _LOGGER.info(f"    - {thermostat_name}:")
+                            _LOGGER.info(f"      ID: {thermostat.get('ThermostatId', 'N/A')}")
+                            _LOGGER.info(f"      Température actuelle: {thermostat.get('CurrentTemperature', 'N/A')}°C")
+                            _LOGGER.info(f"      Température de consigne: {thermostat.get('TemperatureSet', 'N/A')}°C")
 
         except Exception as e:
             _LOGGER.error(f"\033[91m❌ Erreur lors des tests: {str(e)}\033[0m")
