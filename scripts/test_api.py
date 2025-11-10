@@ -6,6 +6,8 @@ import logging
 import argparse
 import os
 import sys
+import json
+from datetime import datetime, timezone
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -17,9 +19,20 @@ from custom_components.aldes.api import AldesApi
 logging.basicConfig(level=logging.INFO)
 _LOGGER = logging.getLogger(__name__)
 
+def get_version_from_manifest():
+    """Reads the version from the manifest.json file."""
+    try:
+        manifest_path = os.path.join(project_root, 'custom_components', 'aldes', 'manifest.json')
+        with open(manifest_path, 'r') as f:
+            manifest = json.load(f)
+            return manifest.get("version", "unknown")
+    except (FileNotFoundError, json.JSONDecodeError):
+        return "unknown"
+
 async def test_api(username: str, password: str):
     """Teste les fonctionnalités principales de l'API."""
-    _LOGGER.info("Démarrage des tests de l'API Aldes")
+    version = get_version_from_manifest()
+    _LOGGER.info(f"Démarrage des tests de l'API Aldes (Version de l'intégration: {version})")
     _LOGGER.debug(f"Test avec l'utilisateur: {username}")
 
     async with aiohttp.ClientSession() as session:
@@ -35,6 +48,7 @@ async def test_api(username: str, password: str):
             # Test data fetching
             _LOGGER.info("\nRécupération des données...")
             data = await api.fetch_data()
+            _LOGGER.info(f"\033[92m✓ Données : {data}")
             _LOGGER.info(f"\033[92m✓ Données récupérées: {len(data)} produits trouvés\033[0m")
 
             # Display data for each product
@@ -58,6 +72,36 @@ async def test_api(username: str, password: str):
                     _LOGGER.info(f"    Mode eau actuel: {indicator.get('current_water_mode', 'N/A')}")
                     _LOGGER.info(f"    Température principale: {indicator.get('tmp_principal', 'N/A')}°C")
                     _LOGGER.info(f"    Quantité d'eau chaude: {indicator.get('qte_eau_chaude', 'N/A')}%")
+                    
+                    hors_gel_status = "Actif" if indicator.get('hors_gel') else "Inactif"
+                    _LOGGER.info(f"    Mode hors gel: {hors_gel_status}")
+
+                    # Vacation mode status and dates
+                    vac_start_str = indicator.get('date_debut_vac')
+                    vac_end_str = indicator.get('date_fin_vac')
+                    
+                    vacation_status = "Inactif"
+                    if vac_start_str and vac_end_str:
+                        try:
+                            # Convert to datetime objects, handling 'Z' for UTC
+                            start_date = datetime.fromisoformat(vac_start_str.replace(' ', 'T').replace('Z', '+00:00'))
+                            end_date = datetime.fromisoformat(vac_end_str.replace(' ', 'T').replace('Z', '+00:00'))
+                            now_utc = datetime.now(timezone.utc)
+
+                            if start_date <= now_utc <= end_date:
+                                vacation_status = "\033[92mActif\033[0m" # Green for active
+                            else:
+                                vacation_status = "\033[91mInactif\033[0m" # Red for inactive
+                        except (ValueError, TypeError):
+                            _LOGGER.warning(f"Could not parse vacation dates: {vac_start_str}, {vac_end_str}")
+                            vacation_status = "Dates invalides"
+
+                    _LOGGER.info(f"    Mode vacances: {vacation_status}")
+                    if vac_start_str:
+                        _LOGGER.info(f"      Début des vacances: {vac_start_str}")
+                    if vac_end_str:
+                        _LOGGER.info(f"      Fin des vacances: {vac_end_str}")
+
 
                     settings = indicator.get("settings")
                     if settings:

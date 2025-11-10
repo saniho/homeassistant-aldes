@@ -10,10 +10,9 @@ from homeassistant.components.climate import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, MANUFACTURER
+from .const import DOMAIN
 from .entity import AldesEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -90,16 +89,6 @@ class AldesClimateEntity(AldesEntity, ClimateEntity):
             ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.TURN_OFF
         )
         self._enable_turn_on_off_backwards_compatibility = False
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return the device info for the thermostat, grouped under the main product."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.modem)},
-            name=self.coordinator.data[0].get("name", "Aldes Product"),
-            manufacturer=MANUFACTURER,
-            model=self.reference,
-        )
 
     @callback
     def _handle_coordinator_update(self) -> None:

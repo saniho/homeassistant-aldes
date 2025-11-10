@@ -26,7 +26,7 @@ _LOGGER = logging.getLogger(__name__)
 class AldesDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Aldes data coordinator."""
 
-    def __init__(self, hass: HomeAssistant, api: AldesApi) -> None:
+    def __init__(self, hass: HomeAssistant, api: AldesApi, version: str) -> None:
         """Initialize."""
         super().__init__(
             hass,
@@ -35,6 +35,7 @@ class AldesDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
         )
         self.api = api
+        self.version = version
         self._failed_updates = 0
         self.health_status = True
 
