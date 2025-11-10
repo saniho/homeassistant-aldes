@@ -57,15 +57,16 @@ class AldesApi:
         self._cache_ttl = timedelta(minutes=5)
         self._user_agent = "AldesConnect/2.0.0"
 
-    def _log_request_details(self, method: str, url: str, headers: Dict, data: Dict = None) -> None:
+    def _log_request_details(self, method: str, url: str, headers: Dict, data: Any = None) -> None:
         """Log request details for debugging."""
         _LOGGER.debug("=== Détails de la requête ===")
         _LOGGER.debug("Méthode: %s", method)
         _LOGGER.debug("URL: %s", url)
         _LOGGER.debug("Headers: %s", {k: v for k, v in headers.items() if k.lower() != 'authorization'})
         if data:
-            safe_data = data.copy()
-            if 'password' in safe_data:
+            safe_data = data
+            if isinstance(data, dict) and 'password' in data:
+                safe_data = data.copy()
                 safe_data['password'] = '***'
             _LOGGER.debug("Data: %s", safe_data)
 
@@ -187,20 +188,80 @@ class AldesApi:
         self, modem: str, thermostat_id: str, thermostat_name: str, target_temperature: float
     ) -> Dict:
         """Set target temperature with retry."""
+        url = f"{self._API_URL_PRODUCTS}/{modem}/updateThermostats"
+        payload = [{
+            "ThermostatId": thermostat_id,
+            "Name": thermostat_name,
+            "TemperatureSet": int(target_temperature),
+        }]
+        
+        self._log_request_details("PATCH", url, {}, payload)
+        
         try:
             async with await self._request_with_auth_interceptor(
                 self._session.patch,
-                f"{self._API_URL_PRODUCTS}/{modem}/updateThermostats",
-                json=[{
-                    "ThermostatId": thermostat_id,
-                    "Name": thermostat_name,
-                    "TemperatureSet": int(target_temperature),
-                }],
+                url,
+                json=payload,
                 timeout=self._timeout
             ) as response:
                 return await response.json()
         except Exception as e:
             _LOGGER.error("Error setting temperature: %s", str(e))
+            raise
+
+    @backoff.on_exception(
+        backoff.expo,
+        (ClientError, asyncio.TimeoutError),
+        max_tries=_MAX_RETRIES,
+        max_time=60
+    )
+    async def change_mode(self, modem: str, mode: str) -> Dict:
+        """Send a command to change the mode."""
+        url = f"{self._API_URL_PRODUCTS}/{modem}/command"
+        payload = {"command": mode}
+        
+        self._log_request_details("POST", url, {}, payload)
+
+        try:
+            async with await self._request_with_auth_interceptor(
+                self._session.post,
+                url,
+                json=payload,
+                timeout=self._timeout
+            ) as response:
+                return await response.json()
+        except Exception as e:
+            _LOGGER.error("Error changing mode: %s", str(e))
+            raise
+
+    @backoff.on_exception(
+        backoff.expo,
+        (ClientError, asyncio.TimeoutError),
+        max_tries=_MAX_RETRIES,
+        max_time=60
+    )
+    async def set_vacation_mode(self, modem: str, start_date: Optional[str], end_date: Optional[str]) -> Dict:
+        """Set or unset vacation mode by updating vacation dates."""
+        url = f"{self._API_URL_PRODUCTS}/{modem}"
+        payload = {
+            "indicator": {
+                "date_debut_vac": start_date,
+                "date_fin_vac": end_date,
+            }
+        }
+        
+        self._log_request_details("PATCH", url, {}, payload)
+
+        try:
+            async with await self._request_with_auth_interceptor(
+                self._session.patch,
+                url,
+                json=payload,
+                timeout=self._timeout
+            ) as response:
+                return await response.json()
+        except Exception as e:
+            _LOGGER.error("Error setting vacation mode: %s", str(e))
             raise
 
     async def _request_with_auth_interceptor(self, request, url: str, **kwargs) -> aiohttp.ClientResponse:
