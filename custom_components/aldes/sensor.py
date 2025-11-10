@@ -201,7 +201,7 @@ class AldesSettingsSensor(AldesEntity, SensorEntity):
     @property
     def extra_state_attributes(self):
         """Return the state attributes."""
-        attributes = super().extra_state_attributes
+        attributes = super().extra_state_attributes or {}
         product_data = next(
             (p for p in self.coordinator.data if p.get("modem") == self.modem),
             None,
@@ -213,6 +213,10 @@ class AldesSettingsSensor(AldesEntity, SensorEntity):
             and "settings" in product_data["indicator"]
         ):
             attributes.update(product_data["indicator"]["settings"])
+        
+        # Add the device_id to make service calls easier
+        if self.registry_entry and self.registry_entry.device_id:
+            attributes["device_id"] = self.registry_entry.device_id
             
         return attributes
 

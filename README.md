@@ -82,6 +82,30 @@ data:
   device_id: VOTRE_DEVICE_ID
 ```
 
+## Données API avancées : Le planning hebdomadaire
+
+L'API Aldes expose les données du planning hebdomadaire via les clés `week_planning` et `week_planning4`. Ces données sont une liste de commandes qui définissent le mode de fonctionnement pour chaque heure de la semaine.
+
+### Structure des commandes
+
+Chaque commande a un format de 3 caractères, par exemple `71B` :
+
+- **Premier caractère (`7`)** : Représente le jour de la semaine (probablement `0` pour Lundi, `1` pour Mardi, etc., jusqu'à `6` pour Dimanche).
+- **Deuxième caractère (`1`)** : Représente un bloc horaire dans la journée.
+- **Troisième caractère (`B`)** : Représente le mode à activer.
+
+### Modes connus
+
+En se basant sur le code de l'intégration, voici les modes que nous pouvons déduire :
+
+- `A` : Off
+- `B` : Heat (Chauffage)
+- `C` : (Mode inconnu, probablement un mode "confort" ou "éco")
+- `E` : Auto
+- `F` : Cool (Refroidissement)
+
+**Note :** Pour le moment, l'intégration ne permet pas de modifier ce planning. Ces informations sont fournies à titre indicatif et pourraient servir de base pour de futures fonctionnalités.
+
 ## Dépannage
 
 En cas de problème de connexion :

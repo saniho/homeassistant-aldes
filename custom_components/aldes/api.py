@@ -2,7 +2,7 @@
 from typing import Dict, Any, Optional
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import backoff
 import aiohttp
 from aiohttp import ClientError, ClientTimeout
@@ -240,25 +240,34 @@ class AldesApi:
         max_tries=_MAX_RETRIES,
         max_time=60
     )
-    async def set_vacation_mode(self, modem: str, start_date: Optional[str], end_date: Optional[str]) -> Dict:
-        """Set or unset vacation mode by updating vacation dates."""
-        url = f"{self._API_URL_PRODUCTS}/{modem}"
-        payload = {
-            "indicator": {
-                "date_debut_vac": start_date,
-                "date_fin_vac": end_date,
-            }
-        }
+    async def set_vacation_mode(self, modem: str, start_date: Optional[datetime], end_date: Optional[datetime]) -> Dict:
+        """Set or unset vacation mode by sending a 'W' command."""
+        url = f"{self._API_URL_PRODUCTS}/{modem}/command"
         
-        self._log_request_details("PATCH", url, {}, payload)
+        if start_date and end_date:
+            # Format dates to YYYYMMDDHHMMSS
+            start_str = start_date.strftime("%Y%m%d%H%M%S")
+            end_str = end_date.strftime("%Y%m%d%H%M%S")
+            command = f"W{start_str}Z{end_str}Z"
+        else:
+            # To disable, send a vacation command for a time in the past
+            past_date = datetime.now(timezone.utc) - timedelta(days=1)
+            past_str = past_date.strftime("%Y%m%d%H%M%S")
+            command = f"W{past_str}Z{past_str}Z"
+
+        payload = {"command": command}
+        self._log_request_details("POST", url, {}, payload)
 
         try:
             async with await self._request_with_auth_interceptor(
-                self._session.patch,
+                self._session.post,
                 url,
                 json=payload,
                 timeout=self._timeout
             ) as response:
+                # The command endpoint returns 204 No Content on success, not JSON
+                if response.status == 204:
+                    return {}
                 return await response.json()
         except Exception as e:
             _LOGGER.error("Error setting vacation mode: %s", str(e))

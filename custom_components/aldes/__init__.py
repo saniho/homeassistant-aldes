@@ -13,7 +13,6 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import aiohttp_client, config_validation as cv, device_registry as dr
-from homeassistant.util import dt as dt_util
 
 from .api import AldesApi
 from .const import CONF_PASSWORD, CONF_USERNAME, DOMAIN, PLATFORMS
@@ -30,8 +29,8 @@ ATTR_END_DATE = "end_date"
 SERVICE_SET_VACATION_DATES_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_DEVICE_ID): cv.string,
-        vol.Optional(ATTR_START_DATE): cv.datetime, # Expects datetime object from Home Assistant
-        vol.Optional(ATTR_END_DATE): cv.datetime,   # Expects datetime object from Home Assistant
+        vol.Optional(ATTR_START_DATE): cv.datetime,
+        vol.Optional(ATTR_END_DATE): cv.datetime,
     }
 )
 
@@ -87,12 +86,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             _LOGGER.error(f"Service call: Modem ID not found for device {device_id}.")
             return
 
-        # Convert datetime objects to API-expected string format
-        start_date_str = start_date_dt.strftime("%Y-%m-%d %H:%M:%SZ") if start_date_dt else None
-        end_date_str = end_date_dt.strftime("%Y-%m-%d %H:%M:%SZ") if end_date_dt else None
-
-        _LOGGER.debug(f"Service call: Setting vacation mode for {modem_id} with start={start_date_str}, end={end_date_str}")
-        await coordinator.api.set_vacation_mode(modem_id, start_date_str, end_date_str)
+        _LOGGER.debug(f"Service call: Setting vacation mode for {modem_id} with start={start_date_dt}, end={end_date_dt}")
+        await coordinator.api.set_vacation_mode(modem_id, start_date_dt, end_date_dt)
         await coordinator.async_request_refresh() # Refresh data to update states
 
     hass.services.async_register(
