@@ -264,6 +264,35 @@ class AldesApi:
             _LOGGER.error("Error setting vacation mode: %s", str(e))
             raise
 
+    @backoff.on_exception(
+        backoff.expo,
+        (ClientError, asyncio.TimeoutError),
+        max_tries=_MAX_RETRIES,
+        max_time=60
+    )
+    async def set_frost_protection(self, modem: str, enabled: bool) -> Dict:
+        """Set or unset frost protection mode."""
+        url = f"{self._API_URL_PRODUCTS}/{modem}"
+        payload = {
+            "indicator": {
+                "hors_gel": enabled,
+            }
+        }
+        
+        self._log_request_details("PATCH", url, {}, payload)
+
+        try:
+            async with await self._request_with_auth_interceptor(
+                self._session.patch,
+                url,
+                json=payload,
+                timeout=self._timeout
+            ) as response:
+                return await response.json()
+        except Exception as e:
+            _LOGGER.error("Error setting frost protection: %s", str(e))
+            raise
+
     async def _request_with_auth_interceptor(self, request, url: str, **kwargs) -> aiohttp.ClientResponse:
         """Enhanced request with auth retry."""
         if datetime.now() >= self._token_expires_at:

@@ -33,14 +33,6 @@ Une fois l'installation terminée :
 3.  Recherchez **"Aldes"**.
 4.  Entrez vos identifiants Aldes (email et mot de passe).
 
-## Fonctionnalités
-
-- Contrôle des thermostats (température de consigne, mode de fonctionnement)
-- Affichage des températures actuelles
-- Capteurs pour le mode air et eau, la quantité d'eau chaude, etc.
-- Interrupteur pour le mode vacances
-- Capteurs binaires pour l'état de connexion, le mode vacances et le mode hors gel
-
 ## Entités créées
 
 L'intégration crée un appareil Aldes dans Home Assistant, qui contient plusieurs entités :
@@ -48,7 +40,47 @@ L'intégration crée un appareil Aldes dans Home Assistant, qui contient plusieu
 - **Climate** : Une entité pour chaque thermostat, permettant de contrôler la température et le mode.
 - **Sensor** : Capteurs pour la température principale, le niveau d'eau chaude, les modes, etc.
 - **Binary Sensor** : Capteurs pour l'état de la connexion, le mode vacances et le mode hors gel.
-- **Switch** : Un interrupteur pour activer/désactiver le mode vacances. **Note :** Cette fonctionnalité est expérimentale. L'activation définit une période de vacances de 7 jours par défaut.
+- **Switch** :
+    - Un interrupteur pour activer/désactiver le mode vacances. **Note :** Cette fonctionnalité est expérimentale. L'activation définit une période de vacances de 7 jours par défaut.
+    - Un interrupteur pour activer/désactiver le mode hors gel. **Note :** Cette fonctionnalité est expérimentale.
+
+## Services
+
+### Service `aldes.set_vacation_dates`
+
+Ce service vous permet de définir une période de vacances personnalisée.
+
+#### Comment l'utiliser
+
+Allez dans **Outils de développement > Services**, recherchez le service `aldes.set_vacation_dates` et remplissez les champs.
+
+#### Paramètres
+
+- **device_id** : (Obligatoire) L'identifiant de votre appareil Aldes. Vous pouvez le trouver dans les détails de l'appareil.
+- **start_date** : (Optionnel) La date et l'heure de début des vacances.
+- **end_date** : (Optionnel) La date et l'heure de fin des vacances.
+
+#### Exemples
+
+**Pour activer le mode vacances du 20 au 27 décembre 2024 :**
+
+```yaml
+service: aldes.set_vacation_dates
+data:
+  device_id: VOTRE_DEVICE_ID
+  start_date: "2024-12-20 08:00:00"
+  end_date: "2024-12-27 18:00:00"
+```
+
+**Pour désactiver le mode vacances :**
+
+Laissez les champs `start_date` et `end_date` vides.
+
+```yaml
+service: aldes.set_vacation_dates
+data:
+  device_id: VOTRE_DEVICE_ID
+```
 
 ## Dépannage
 

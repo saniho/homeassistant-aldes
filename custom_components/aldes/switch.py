@@ -28,10 +28,17 @@ async def async_setup_entry(
         if not modem_id or modem_id == "N/A":
             continue
 
+        indicator_data = product.get("indicator", {})
+
         # Create vacation mode switch if data is available
-        if product.get("indicator", {}).get("date_debut_vac") is not None:
+        if "date_debut_vac" in indicator_data:
             _LOGGER.debug(f"Creating vacation mode switch for {modem_id}")
             switches.append(AldesVacationModeSwitch(coordinator, entry, modem_id, product))
+
+        # Create frost protection switch if data is available
+        if "hors_gel" in indicator_data:
+            _LOGGER.debug(f"Creating frost protection switch for {modem_id}")
+            switches.append(AldesFrostProtectionSwitch(coordinator, entry, modem_id, product))
 
     async_add_entities(switches)
 
@@ -97,4 +104,52 @@ class AldesVacationModeSwitch(AldesEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs) -> None:
         """Turn the vacation mode off by setting dates to None."""
         await self.coordinator.api.set_vacation_mode(self.modem, None, None)
+        await self.coordinator.async_request_refresh()
+
+
+class AldesFrostProtectionSwitch(AldesEntity, SwitchEntity):
+    """Represents the frost protection switch for an Aldes product."""
+
+    def __init__(
+        self,
+        coordinator,
+        config_entry,
+        modem_id,
+        product,
+    ):
+        """Initialize the switch."""
+        super().__init__(
+            coordinator,
+            config_entry,
+            modem_id,
+            product.get("reference"),
+            modem_id,
+        )
+        self._attr_unique_id = f"{DOMAIN}_{modem_id}_frost_protection_switch"
+        self._attr_name = "Aldes Frost Protection"
+        self._attr_icon = "mdi:snowflake-alert"
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        product_data = next(
+            (p for p in self.coordinator.data if p.get("modem") == self.modem),
+            None,
+        )
+        
+        if product_data and product_data.get("indicator"):
+            self._attr_is_on = product_data["indicator"].get("hors_gel", False)
+        else:
+            self._attr_is_on = False
+        
+        super()._handle_coordinator_update()
+
+    async def async_turn_on(self, **kwargs) -> None:
+        """Turn frost protection on."""
+        await self.coordinator.api.set_frost_protection(self.modem, True)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs) -> None:
+        """Turn frost protection off."""
+        await self.coordinator.api.set_frost_protection(self.modem, False)
         await self.coordinator.async_request_refresh()
