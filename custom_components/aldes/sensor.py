@@ -11,10 +11,10 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, MANUFACTURER
+from .const import DOMAIN
 from .entity import AldesEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,6 +45,18 @@ PRODUCT_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
         name="Water Mode",
         icon="mdi:water",
     ),
+    SensorEntityDescription(
+        key="date_debut_vac",
+        name="Vacation Start",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:calendar-start",
+    ),
+    SensorEntityDescription(
+        key="date_fin_vac",
+        name="Vacation End",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:calendar-end",
+    ),
 )
 
 
@@ -58,8 +70,9 @@ async def async_setup_entry(
     sensors: list[SensorEntity] = []
     for product in coordinator.data:
         modem_id = product.get("modem")
-        if not modem_id:
-            _LOGGER.warning("Skipping product with no modem ID: %s", product)
+        # Prevent creation of entities with invalid ID
+        if not modem_id or modem_id == "N/A":
+            _LOGGER.warning("Skipping product with invalid modem ID: %s", modem_id)
             continue
 
         _LOGGER.debug(f"Setting up sensors for product with modem ID: {modem_id}")
@@ -71,7 +84,7 @@ async def async_setup_entry(
         # --- Product Sensors ---
         known_keys = {desc.key for desc in PRODUCT_SENSOR_DESCRIPTIONS}
         for description in PRODUCT_SENSOR_DESCRIPTIONS:
-            if description.key in indicator_data:
+            if description.key in indicator_data and indicator_data[description.key] is not None:
                 _LOGGER.debug(f"Creating sensor '{description.name}' for {modem_id}")
                 sensors.append(
                     AldesProductSensor(coordinator, entry, modem_id, product, description)
@@ -146,9 +159,16 @@ class AldesProductSensor(AldesEntity, SensorEntity):
             and product_data.get("isConnected")
             and product_data.get("indicator")
         ):
-            self._attr_native_value = product_data["indicator"].get(
-                self.entity_description.key
-            )
+            value = product_data["indicator"].get(self.entity_description.key)
+            # Reformat datetime string for timestamp sensors
+            if self.entity_description.device_class == SensorDeviceClass.TIMESTAMP and isinstance(value, str):
+                try:
+                    # Input: "2025-11-06 10:31:12Z" -> Output: datetime object
+                    self._attr_native_value = dt_util.parse_datetime(value.replace(" ", "T"))
+                except (ValueError, TypeError):
+                    self._attr_native_value = None # Don't set invalid date
+            else:
+                self._attr_native_value = value
         else:
             self._attr_native_value = None
         
@@ -255,18 +275,6 @@ class AldesThermostatSensor(AldesEntity, SensorEntity):
         
         thermostat_name = self.thermostat.get("Name") or f"Thermostat {self.thermostat_id}"
         self._attr_name = f"{thermostat_name} Temperature"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return the device info for the thermostat, grouped under the main product."""
-        thermostat_name = self.thermostat.get("Name") or f"Thermostat {self.thermostat_id}"
-        return DeviceInfo(
-            identifiers={(DOMAIN, self.thermostat_id)},
-            name=thermostat_name,
-            manufacturer=MANUFACTURER,
-            model="Thermostat",
-            via_device=(DOMAIN, self.modem),  # Link to the main device
-        )
 
     @callback
     def _handle_coordinator_update(self) -> None:
