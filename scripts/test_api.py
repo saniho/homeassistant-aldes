@@ -55,9 +55,9 @@ async def test_api(username: str, password: str):
             #_LOGGER.info(f"\033[92m✓ Données récupérées: {len(data)} produits trouvés\033[0m")
 
             # --- Raw JSON Output (Wrapper Output) ---
-            _LOGGER.info("\n[1m--- Début des données brutes (sortie du wrapper) ---\033[0m")
-            print(json.dumps(data, indent=2))
-            _LOGGER.info("[1m--- Fin des données brutes ---\033[0m")
+            #_LOGGER.info("\n[1m--- Début des données brutes (sortie du wrapper) ---\033[0m")
+            #print(json.dumps(data, indent=2))
+            #_LOGGER.info("[1m--- Fin des données brutes ---\033[0m")
 
 
             # Display formatted data for each product

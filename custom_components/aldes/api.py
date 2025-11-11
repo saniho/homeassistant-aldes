@@ -248,28 +248,31 @@ class AldesApi:
     )
     async def set_vacation_mode(self, modem: str, start_date: Optional[datetime], end_date: Optional[datetime]) -> Dict:
         """Set or unset vacation mode by sending a 'W' command."""
-        url = f"{self._API_URL_PRODUCTS}/{modem}/commands" # Corrected endpoint with 's'
+        url = f"{self._API_URL_PRODUCTS}/{modem}/commands"
         
         if start_date and end_date:
+            # Ensure dates are in UTC before formatting
+            start_utc = start_date.astimezone(timezone.utc)
+            end_utc = end_date.astimezone(timezone.utc)
+            
             # Format dates to YYYYMMDDHHMMSS
-            start_str = start_date.strftime("%Y%m%d%H%M%S")
-            end_str = end_date.strftime("%Y%m%d%H%M%S")
+            start_str = start_utc.strftime("%Y%m%d%H%M%S")
+            end_str = end_utc.strftime("%Y%m%d%H%M%S")
             command = f"W{start_str}Z{end_str}Z"
         else:
             # To disable, send a vacation command for a time in the past
-            # This will effectively cancel any active vacation mode
             past_date = datetime.now(timezone.utc) - timedelta(days=1)
             past_str = past_date.strftime("%Y%m%d%H%M%S")
             command = f"W{past_str}Z{past_str}Z"
-        #TODO : probleme fuseau horaire Z
+
         #payload = {"command": command}
         payload = {
-            "method": "changeMode",
-            "params": [command]
+          "method": "changeMode",
+          "params": [command]
         }
         self._log_request_details("POST", url, {}, payload)
-        print(payload)
-        #print(1/0)
+        #print(payload)
+        #print( 1/0)
         try:
             async with await self._request_with_auth_interceptor(
                 self._session.post,
@@ -277,11 +280,10 @@ class AldesApi:
                 json=payload,
                 timeout=self._timeout
             ) as response:
-                response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
-                # The command endpoint often returns 204 No Content or 200 OK with empty body
+                response.raise_for_status()
                 if 'application/json' in response.headers.get('Content-Type', ''):
                     return await response.json()
-                return {} # Return empty dict if no JSON content is expected or found
+                return {}
         except Exception as e:
             _LOGGER.error("Error setting vacation mode: %s", str(e))
             raise
