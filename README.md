@@ -33,6 +33,22 @@ Une fois l'installation terminée :
 3.  Recherchez **"Aldes"**.
 4.  Entrez vos identifiants Aldes (email et mot de passe).
 
+## Fonctionnalités
+
+L'intégration vous permet de visualiser et de contrôler de nombreux aspects de votre système Aldes :
+
+### Consultation
+- **État général** : Visualisez l'état de la connexion, la température principale du système et la quantité d'eau chaude restante.
+- **Modes actuels** : Suivez le mode de fonctionnement de l'air (Chauffage, Refroidissement, Auto, etc.) et de l'eau.
+- **Thermostats individuels** : Consultez la température actuelle et la température de consigne pour chaque pièce.
+- **Modes spéciaux** : Sachez si le mode "hors gel" ou le mode "vacances" est actuellement actif.
+
+### Contrôle
+- **Température** : Ajustez la température de consigne pour chaque thermostat individuellement.
+- **Mode de fonctionnement** : Changez le mode principal de l'appareil (Chauffage, Refroidissement, Auto, Arrêt).
+- **Mode vacances (Bêta)** : Activez ou désactivez le mode vacances via un interrupteur, ou programmez une période de vacances personnalisée grâce à un service dédié.
+- **Mode hors gel (Bêta)** : Activez ou désactivez la protection hors gel via un interrupteur.
+
 ## Entités créées
 
 L'intégration crée un appareil Aldes dans Home Assistant, qui contient plusieurs entités :
@@ -41,8 +57,8 @@ L'intégration crée un appareil Aldes dans Home Assistant, qui contient plusieu
 - **Sensor** : Capteurs pour la température principale, le niveau d'eau chaude, les modes, etc.
 - **Binary Sensor** : Capteurs pour l'état de la connexion, le mode vacances et le mode hors gel.
 - **Switch** :
-    - Un interrupteur pour activer/désactiver le mode vacances. **Note :** Cette fonctionnalité est expérimentale. L'activation définit une période de vacances de 7 jours par défaut.
-    - Un interrupteur pour activer/désactiver le mode hors gel. **Note :** Cette fonctionnalité est expérimentale.
+    - Un interrupteur pour activer/désactiver le mode vacances. **(Fonctionnalité en Bêta)**
+    - Un interrupteur pour activer/désactiver le mode hors gel. **(Fonctionnalité en Bêta)**
 
 ## Services
 
