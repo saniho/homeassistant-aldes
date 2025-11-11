@@ -204,7 +204,10 @@ class AldesApi:
                 json=payload,
                 timeout=self._timeout
             ) as response:
-                return await response.json()
+                response.raise_for_status()
+                if 'application/json' in response.headers.get('Content-Type', ''):
+                    return await response.json()
+                return {} # Return empty dict if no JSON content is expected or found
         except Exception as e:
             _LOGGER.error("Error setting temperature: %s", str(e))
             raise
@@ -229,7 +232,10 @@ class AldesApi:
                 json=payload,
                 timeout=self._timeout
             ) as response:
-                return await response.json()
+                response.raise_for_status()
+                if 'application/json' in response.headers.get('Content-Type', ''):
+                    return await response.json()
+                return {} # Return empty dict if no JSON content is expected or found
         except Exception as e:
             _LOGGER.error("Error changing mode: %s", str(e))
             raise
@@ -242,7 +248,7 @@ class AldesApi:
     )
     async def set_vacation_mode(self, modem: str, start_date: Optional[datetime], end_date: Optional[datetime]) -> Dict:
         """Set or unset vacation mode by sending a 'W' command."""
-        url = f"{self._API_URL_PRODUCTS}/{modem}/command"
+        url = f"{self._API_URL_PRODUCTS}/{modem}/commands" # Corrected endpoint with 's'
         
         if start_date and end_date:
             # Format dates to YYYYMMDDHHMMSS
@@ -251,13 +257,19 @@ class AldesApi:
             command = f"W{start_str}Z{end_str}Z"
         else:
             # To disable, send a vacation command for a time in the past
+            # This will effectively cancel any active vacation mode
             past_date = datetime.now(timezone.utc) - timedelta(days=1)
             past_str = past_date.strftime("%Y%m%d%H%M%S")
             command = f"W{past_str}Z{past_str}Z"
-
-        payload = {"command": command}
+        #TODO : probleme fuseau horaire Z
+        #payload = {"command": command}
+        payload = {
+            "method": "changeMode",
+            "params": [command]
+        }
         self._log_request_details("POST", url, {}, payload)
-
+        print(payload)
+        #print(1/0)
         try:
             async with await self._request_with_auth_interceptor(
                 self._session.post,
@@ -265,10 +277,11 @@ class AldesApi:
                 json=payload,
                 timeout=self._timeout
             ) as response:
-                # The command endpoint returns 204 No Content on success, not JSON
-                if response.status == 204:
-                    return {}
-                return await response.json()
+                response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
+                # The command endpoint often returns 204 No Content or 200 OK with empty body
+                if 'application/json' in response.headers.get('Content-Type', ''):
+                    return await response.json()
+                return {} # Return empty dict if no JSON content is expected or found
         except Exception as e:
             _LOGGER.error("Error setting vacation mode: %s", str(e))
             raise
@@ -297,7 +310,10 @@ class AldesApi:
                 json=payload,
                 timeout=self._timeout
             ) as response:
-                return await response.json()
+                response.raise_for_status()
+                if 'application/json' in response.headers.get('Content-Type', ''):
+                    return await response.json()
+                return {} # Return empty dict if no JSON content is expected or found
         except Exception as e:
             _LOGGER.error("Error setting frost protection: %s", str(e))
             raise

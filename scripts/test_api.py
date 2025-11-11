@@ -52,7 +52,7 @@ async def test_api(username: str, password: str):
                 _LOGGER.warning("Aucune donnée n'a été récupérée de l'API.")
                 return
 
-            _LOGGER.info(f"\033[92m✓ Données récupérées: {len(data)} produits trouvés\033[0m")
+            #_LOGGER.info(f"\033[92m✓ Données récupérées: {len(data)} produits trouvés\033[0m")
 
             # --- Raw JSON Output (Wrapper Output) ---
             _LOGGER.info("\n[1m--- Début des données brutes (sortie du wrapper) ---\033[0m")
