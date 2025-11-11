@@ -95,14 +95,14 @@ class AldesVacationModeSwitch(AldesEntity, SwitchEntity):
         """Turn the vacation mode on."""
         # By default, set vacation for 7 days
         now = dt_util.utcnow()
-        start_date = now.strftime("%Y-%m-%d %H:%M:%SZ")
-        end_date = (now + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%SZ")
+        start_date = now
+        end_date = now + timedelta(days=7)
         
         await self.coordinator.api.set_vacation_mode(self.modem, start_date, end_date)
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs) -> None:
-        """Turn the vacation mode off by setting dates to None."""
+        """Turn the vacation mode off by sending the reset command."""
         await self.coordinator.api.set_vacation_mode(self.modem, None, None)
         await self.coordinator.async_request_refresh()
 
@@ -138,18 +138,19 @@ class AldesFrostProtectionSwitch(AldesEntity, SwitchEntity):
         )
         
         if product_data and product_data.get("indicator"):
-            self._attr_is_on = product_data["indicator"].get("hors_gel", False)
+            # The switch is on if the mode is 'H' (Hors Gel)
+            self._attr_is_on = product_data["indicator"].get("current_air_mode") == "H"
         else:
             self._attr_is_on = False
         
         super()._handle_coordinator_update()
 
     async def async_turn_on(self, **kwargs) -> None:
-        """Turn frost protection on."""
+        """Turn frost protection on by sending the 'H' command."""
         await self.coordinator.api.set_frost_protection(self.modem, True)
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs) -> None:
-        """Turn frost protection off."""
+        """Turn frost protection off by sending the 'E' (Auto) command."""
         await self.coordinator.api.set_frost_protection(self.modem, False)
         await self.coordinator.async_request_refresh()

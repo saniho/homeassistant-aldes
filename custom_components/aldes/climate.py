@@ -89,6 +89,9 @@ class AldesClimateEntity(AldesEntity, ClimateEntity):
             ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.TURN_OFF
         )
         self._enable_turn_on_off_backwards_compatibility = False
+        
+        # Initialize hvac_mode to prevent startup errors
+        self._attr_hvac_mode = None
 
     @property
     def extra_state_attributes(self):

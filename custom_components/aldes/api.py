@@ -207,7 +207,7 @@ class AldesApi:
                 response.raise_for_status()
                 if 'application/json' in response.headers.get('Content-Type', ''):
                     return await response.json()
-                return {} # Return empty dict if no JSON content is expected or found
+                return {}
         except Exception as e:
             _LOGGER.error("Error setting temperature: %s", str(e))
             raise
@@ -220,7 +220,7 @@ class AldesApi:
     )
     async def change_mode(self, modem: str, mode: str) -> Dict:
         """Send a command to change the mode."""
-        url = f"{self._API_URL_PRODUCTS}/{modem}/command"
+        url = f"{self._API_URL_PRODUCTS}/{modem}/commands"
         payload = {"command": mode}
         
         self._log_request_details("POST", url, {}, payload)
@@ -235,7 +235,7 @@ class AldesApi:
                 response.raise_for_status()
                 if 'application/json' in response.headers.get('Content-Type', ''):
                     return await response.json()
-                return {} # Return empty dict if no JSON content is expected or found
+                return {}
         except Exception as e:
             _LOGGER.error("Error changing mode: %s", str(e))
             raise
@@ -251,19 +251,18 @@ class AldesApi:
         url = f"{self._API_URL_PRODUCTS}/{modem}/commands"
         
         if start_date and end_date:
-            # Ensure dates are in UTC before formatting
             start_utc = start_date.astimezone(timezone.utc)
             end_utc = end_date.astimezone(timezone.utc)
-            
-            # Format dates to YYYYMMDDHHMMSS
             start_str = start_utc.strftime("%Y%m%d%H%M%S")
             end_str = end_utc.strftime("%Y%m%d%H%M%S")
             command = f"W{start_str}Z{end_str}Z"
         else:
-            # To disable, send the specific "reset" command
             command = "W00010101000000Z00010101000000Z"
 
-        payload = {"command": command}
+        payload = {
+            "method": "changeMode",
+            "params": [command]
+        }
         self._log_request_details("POST", url, {}, payload)
 
         try:
@@ -273,11 +272,10 @@ class AldesApi:
                 json=payload,
                 timeout=self._timeout
             ) as response:
-                response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
-                # The command endpoint often returns 204 No Content or 200 OK with empty body
+                response.raise_for_status()
                 if 'application/json' in response.headers.get('Content-Type', ''):
                     return await response.json()
-                return {} # Return empty dict if no JSON content is expected or found
+                return {}
         except Exception as e:
             _LOGGER.error("Error setting vacation mode: %s", str(e))
             raise
@@ -289,30 +287,10 @@ class AldesApi:
         max_time=60
     )
     async def set_frost_protection(self, modem: str, enabled: bool) -> Dict:
-        """Set or unset frost protection mode."""
-        url = f"{self._API_URL_PRODUCTS}/{modem}"
-        payload = {
-            "indicator": {
-                "hors_gel": enabled,
-            }
-        }
-        
-        self._log_request_details("PATCH", url, {}, payload)
-
-        try:
-            async with await self._request_with_auth_interceptor(
-                self._session.patch,
-                url,
-                json=payload,
-                timeout=self._timeout
-            ) as response:
-                response.raise_for_status()
-                if 'application/json' in response.headers.get('Content-Type', ''):
-                    return await response.json()
-                return {} # Return empty dict if no JSON content is expected or found
-        except Exception as e:
-            _LOGGER.error("Error setting frost protection: %s", str(e))
-            raise
+        """Set or unset frost protection mode by sending a command."""
+        # Assuming 'H' enables frost protection and 'E' (Auto) disables it.
+        command = "H" if enabled else "E"
+        return await self.change_mode(modem, command)
 
     async def _request_with_auth_interceptor(self, request, url: str, **kwargs) -> aiohttp.ClientResponse:
         """Enhanced request with auth retry."""
@@ -322,7 +300,7 @@ class AldesApi:
         try:
             headers = {
                 self._AUTHORIZATION_HEADER_KEY: self._build_authorization(),
-                self._API_KEY_HEADER: self._API_KEY  # Ajout de l'API key dans tous les appels
+                self._API_KEY_HEADER: self._API_KEY
             }
             if 'headers' in kwargs:
                 headers.update(kwargs['headers'])
