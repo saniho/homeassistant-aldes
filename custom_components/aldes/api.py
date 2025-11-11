@@ -2,7 +2,7 @@
 from typing import Dict, Any, Optional
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import backoff
 import aiohttp
 from aiohttp import ClientError, ClientTimeout
@@ -57,15 +57,16 @@ class AldesApi:
         self._cache_ttl = timedelta(minutes=5)
         self._user_agent = "AldesConnect/2.0.0"
 
-    def _log_request_details(self, method: str, url: str, headers: Dict, data: Dict = None) -> None:
+    def _log_request_details(self, method: str, url: str, headers: Dict, data: Any = None) -> None:
         """Log request details for debugging."""
         _LOGGER.debug("=== Détails de la requête ===")
         _LOGGER.debug("Méthode: %s", method)
         _LOGGER.debug("URL: %s", url)
         _LOGGER.debug("Headers: %s", {k: v for k, v in headers.items() if k.lower() != 'authorization'})
         if data:
-            safe_data = data.copy()
-            if 'password' in safe_data:
+            safe_data = data
+            if isinstance(data, dict) and 'password' in data:
+                safe_data = data.copy()
                 safe_data['password'] = '***'
             _LOGGER.debug("Data: %s", safe_data)
 
@@ -187,21 +188,109 @@ class AldesApi:
         self, modem: str, thermostat_id: str, thermostat_name: str, target_temperature: float
     ) -> Dict:
         """Set target temperature with retry."""
+        url = f"{self._API_URL_PRODUCTS}/{modem}/updateThermostats"
+        payload = [{
+            "ThermostatId": thermostat_id,
+            "Name": thermostat_name,
+            "TemperatureSet": int(target_temperature),
+        }]
+        
+        self._log_request_details("PATCH", url, {}, payload)
+        
         try:
             async with await self._request_with_auth_interceptor(
                 self._session.patch,
-                f"{self._API_URL_PRODUCTS}/{modem}/updateThermostats",
-                json=[{
-                    "ThermostatId": thermostat_id,
-                    "Name": thermostat_name,
-                    "TemperatureSet": int(target_temperature),
-                }],
+                url,
+                json=payload,
                 timeout=self._timeout
             ) as response:
-                return await response.json()
+                response.raise_for_status()
+                if 'application/json' in response.headers.get('Content-Type', ''):
+                    return await response.json()
+                return {}
         except Exception as e:
             _LOGGER.error("Error setting temperature: %s", str(e))
             raise
+
+    @backoff.on_exception(
+        backoff.expo,
+        (ClientError, asyncio.TimeoutError),
+        max_tries=_MAX_RETRIES,
+        max_time=60
+    )
+    async def change_mode(self, modem: str, mode: str) -> Dict:
+        """Send a command to change the mode."""
+        url = f"{self._API_URL_PRODUCTS}/{modem}/commands"
+        payload = {"command": mode}
+        
+        self._log_request_details("POST", url, {}, payload)
+
+        try:
+            async with await self._request_with_auth_interceptor(
+                self._session.post,
+                url,
+                json=payload,
+                timeout=self._timeout
+            ) as response:
+                response.raise_for_status()
+                if 'application/json' in response.headers.get('Content-Type', ''):
+                    return await response.json()
+                return {}
+        except Exception as e:
+            _LOGGER.error("Error changing mode: %s", str(e))
+            raise
+
+    @backoff.on_exception(
+        backoff.expo,
+        (ClientError, asyncio.TimeoutError),
+        max_tries=_MAX_RETRIES,
+        max_time=60
+    )
+    async def set_vacation_mode(self, modem: str, start_date: Optional[datetime], end_date: Optional[datetime]) -> Dict:
+        """Set or unset vacation mode by sending a 'W' command."""
+        url = f"{self._API_URL_PRODUCTS}/{modem}/commands"
+        
+        if start_date and end_date:
+            start_utc = start_date.astimezone(timezone.utc)
+            end_utc = end_date.astimezone(timezone.utc)
+            start_str = start_utc.strftime("%Y%m%d%H%M%S")
+            end_str = end_utc.strftime("%Y%m%d%H%M%S")
+            command = f"W{start_str}Z{end_str}Z"
+        else:
+            command = "W00010101000000Z00010101000000Z"
+
+        payload = {
+            "method": "changeMode",
+            "params": [command]
+        }
+        self._log_request_details("POST", url, {}, payload)
+
+        try:
+            async with await self._request_with_auth_interceptor(
+                self._session.post,
+                url,
+                json=payload,
+                timeout=self._timeout
+            ) as response:
+                response.raise_for_status()
+                if 'application/json' in response.headers.get('Content-Type', ''):
+                    return await response.json()
+                return {}
+        except Exception as e:
+            _LOGGER.error("Error setting vacation mode: %s", str(e))
+            raise
+
+    @backoff.on_exception(
+        backoff.expo,
+        (ClientError, asyncio.TimeoutError),
+        max_tries=_MAX_RETRIES,
+        max_time=60
+    )
+    async def set_frost_protection(self, modem: str, enabled: bool) -> Dict:
+        """Set or unset frost protection mode by sending a command."""
+        # Assuming 'H' enables frost protection and 'E' (Auto) disables it.
+        command = "H" if enabled else "E"
+        return await self.change_mode(modem, command)
 
     async def _request_with_auth_interceptor(self, request, url: str, **kwargs) -> aiohttp.ClientResponse:
         """Enhanced request with auth retry."""
@@ -211,7 +300,7 @@ class AldesApi:
         try:
             headers = {
                 self._AUTHORIZATION_HEADER_KEY: self._build_authorization(),
-                self._API_KEY_HEADER: self._API_KEY  # Ajout de l'API key dans tous les appels
+                self._API_KEY_HEADER: self._API_KEY
             }
             if 'headers' in kwargs:
                 headers.update(kwargs['headers'])

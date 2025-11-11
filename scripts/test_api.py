@@ -36,7 +36,6 @@ async def test_api(username: str, password: str):
     _LOGGER.debug(f"Test avec l'utilisateur: {username}")
 
     async with aiohttp.ClientSession() as session:
-        # The API key is handled inside the AldesApi class now
         api = AldesApi(username, password, session)
 
         try:
@@ -48,10 +47,20 @@ async def test_api(username: str, password: str):
             # Test data fetching
             _LOGGER.info("\nRécupération des données...")
             data = await api.fetch_data()
-            _LOGGER.info(f"\033[92m✓ Données : {data}")
-            _LOGGER.info(f"\033[92m✓ Données récupérées: {len(data)} produits trouvés\033[0m")
+            
+            if not data:
+                _LOGGER.warning("Aucune donnée n'a été récupérée de l'API.")
+                return
 
-            # Display data for each product
+            #_LOGGER.info(f"\033[92m✓ Données récupérées: {len(data)} produits trouvés\033[0m")
+
+            # --- Raw JSON Output (Wrapper Output) ---
+            #_LOGGER.info("\n[1m--- Début des données brutes (sortie du wrapper) ---\033[0m")
+            #print(json.dumps(data, indent=2))
+            #_LOGGER.info("[1m--- Fin des données brutes ---\033[0m")
+
+
+            # Display formatted data for each product
             for product in data:
                 _LOGGER.info("\n[1mDétails du produit:[0m")
                 _LOGGER.info(f"  ID: {product.get('modem', 'N/A')}")
@@ -117,13 +126,13 @@ async def test_api(username: str, password: str):
                             _LOGGER.info(f"      ID: {thermostat.get('ThermostatId', 'N/A')}")
                             _LOGGER.info(f"      Température actuelle: {thermostat.get('CurrentTemperature', 'N/A')}°C")
                             _LOGGER.info(f"      Température de consigne: {thermostat.get('TemperatureSet', 'N/A')}°C")
+            
+            _LOGGER.info("\n\033[92m✓ Tests terminés avec succès!\033[0m")
 
         except Exception as e:
             _LOGGER.error(f"\033[91m❌ Erreur lors des tests: {str(e)}\033[0m")
             # Optionally re-raise to see the full stack trace
             # raise
-        else:
-            _LOGGER.info("\n\033[92m✓ Tests terminés avec succès!\033[0m")
 
 def main():
     """Point d'entrée principal."""

@@ -54,7 +54,7 @@ async def async_setup_entry(
 class AldesClimateEntity(AldesEntity, ClimateEntity):
     """Define an Aldes climate entity."""
 
-    _attr_has_entity_name = True
+    _attr_has_entity_name = False
 
     def __init__(
         self,
@@ -89,6 +89,16 @@ class AldesClimateEntity(AldesEntity, ClimateEntity):
             ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.TURN_OFF
         )
         self._enable_turn_on_off_backwards_compatibility = False
+        
+        # Initialize hvac_mode to prevent startup errors
+        self._attr_hvac_mode = None
+
+    @property
+    def extra_state_attributes(self):
+        """Return the state attributes of the climate entity."""
+        attributes = super().extra_state_attributes or {}
+        attributes["thermostat_id"] = self.thermostat_id
+        return attributes
 
     @callback
     def _handle_coordinator_update(self) -> None:

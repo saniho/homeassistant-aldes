@@ -1,7 +1,7 @@
 {
   "domain": "aldes",
   "name": "Aldes",
-  "version": "v3.1.0",
+  "version": "v3.3.0",
   "integration_type": "hub",
   "documentation": "https://github.com/saniho/homeassistant-aldes",
   "issue_tracker": "https://github.com/saniho/homeassistant-aldes/issues",

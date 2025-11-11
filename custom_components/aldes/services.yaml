@@ -1,0 +1,23 @@
+set_vacation_dates:
+  name: Set Vacation Dates
+  description: >-
+    Sets or unsets the vacation period for an Aldes device. 
+    Note: The change may take a few minutes to be reflected on the device.
+  fields:
+    device_id:
+      name: Device
+      description: The Aldes device to control.
+      required: true
+      selector:
+        device:
+          integration: aldes
+    start_date:
+      name: Start Date
+      description: The start date and time of the vacation period. Leave empty to unset.
+      selector:
+        datetime:
+    end_date:
+      name: End Date
+      description: The end date and time of the vacation period. Leave empty to unset.
+      selector:
+        datetime:
