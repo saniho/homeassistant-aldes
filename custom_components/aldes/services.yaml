@@ -1,6 +1,8 @@
 set_vacation_dates:
   name: Set Vacation Dates
-  description: Sets or unsets the vacation period for an Aldes device.
+  description: >-
+    Sets or unsets the vacation period for an Aldes device. 
+    Note: The change may take a few minutes to be reflected on the device.
   fields:
     device_id:
       name: Device

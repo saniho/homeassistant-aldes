@@ -48,19 +48,17 @@ L'intégration crée un appareil Aldes dans Home Assistant, qui contient plusieu
 
 ### Service `aldes.set_vacation_dates`
 
-Ce service vous permet de définir une période de vacances personnalisée.
+Ce service vous permet de définir une période de vacances personnalisée. L'interface est accessible via **Outils de développement > Services**.
 
-#### Comment l'utiliser
-
-Allez dans **Outils de développement > Services**, recherchez le service `aldes.set_vacation_dates` et remplissez les champs.
+**Note :** La prise en compte de la commande par l'appareil peut prendre quelques minutes.
 
 #### Paramètres
 
-- **device_id** : (Obligatoire) L'identifiant de votre appareil Aldes. Vous pouvez le trouver dans les détails de l'appareil.
-- **start_date** : (Optionnel) La date et l'heure de début des vacances.
-- **end_date** : (Optionnel) La date et l'heure de fin des vacances.
+- **Device** : (Obligatoire) Un menu déroulant pour choisir votre appareil Aldes.
+- **Start Date** : (Optionnel) La date et l'heure de début des vacances.
+- **End Date** : (Optionnel) La date et l'heure de fin des vacances.
 
-#### Exemples
+#### Exemples d'utilisation
 
 **Pour activer le mode vacances du 20 au 27 décembre 2024 :**
 
@@ -96,13 +94,14 @@ Chaque commande a un format de 3 caractères, par exemple `71B` :
 
 ### Modes connus
 
-En se basant sur le code de l'intégration, voici les modes que nous pouvons déduire :
+En se basant sur le code de l'intégration et les données de l'API, voici les modes que nous pouvons déduire :
 
 - `A` : Off
 - `B` : Heat (Chauffage)
 - `C` : (Mode inconnu, probablement un mode "confort" ou "éco")
 - `E` : Auto
 - `F` : Cool (Refroidissement)
+- `G` à `N` : Autres modes (probablement des variations de "confort", "éco", ou des modes spécifiques à l'eau chaude).
 
 **Note :** Pour le moment, l'intégration ne permet pas de modifier ce planning. Ces informations sont fournies à titre indicatif et pourraient servir de base pour de futures fonctionnalités.
 
@@ -113,10 +112,26 @@ En cas de problème de connexion :
 2. Assurez-vous que vous pouvez vous connecter à l'application mobile officielle Aldes.
 3. Vérifiez les logs de Home Assistant pour plus de détails (Paramètres > Système > Journaux).
 
-## API Test
+## Scripts de Test
 
-Un script de test de l'API est fourni pour vérifier votre connexion en dehors de Home Assistant :
+Des scripts de test sont fournis pour vérifier les fonctionnalités de l'API en dehors de Home Assistant.
+
+### Test général de l'API
 
 ```bash
 python scripts/test_api.py votre_email votre_mot_de_passe
+```
+
+### Test du mode vacances
+
+Ce script permet d'activer ou de désactiver le mode vacances.
+
+**Pour activer :**
+```bash
+python scripts/test_vacation_mode.py votre_email votre_mot_de_passe --start "AAAA-MM-JJ HH:MM:SS" --end "AAAA-MM-JJ HH:MM:SS"
+```
+
+**Pour désactiver :**
+```bash
+python scripts/test_vacation_mode.py votre_email votre_mot_de_passe --disable
 ```
