@@ -38,12 +38,13 @@ SERVICE_SET_VACATION_DATES_SCHEMA = vol.Schema(
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Aldes from a config entry."""
     
-    # Read the integration version from the manifest
+    # Read the integration version from the manifest asynchronously
     version = "unknown"
     manifest_path = Path(hass.config.path(f"custom_components/{DOMAIN}/manifest.json"))
     if manifest_path.is_file():
         try:
-            manifest = json.loads(manifest_path.read_text())
+            manifest_text = await hass.async_add_executor_job(manifest_path.read_text)
+            manifest = json.loads(manifest_text)
             version = manifest.get("version", "unknown")
         except (json.JSONDecodeError, FileNotFoundError):
             _LOGGER.error("Could not read version from manifest.json")
