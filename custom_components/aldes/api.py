@@ -287,10 +287,36 @@ class AldesApi:
         max_time=60
     )
     async def set_frost_protection(self, modem: str, enabled: bool) -> Dict:
-        """Set or unset frost protection mode by sending a command."""
-        # Assuming 'H' enables frost protection and 'E' (Auto) disables it.
-        command = "H" if enabled else "E"
-        return await self.change_mode(modem, command)
+        url = f"{self._API_URL_PRODUCTS}/{modem}/commands"
+
+        if enabled:
+            start_utc = datetime.now(timezone.utc)
+            start_str = start_utc.strftime("%Y%m%d%H%M%S")
+            end_str = "00000000000000"
+            command = f"W{start_str}Z{end_str}Z"
+        else:
+            command = "W00010101000000Z00010101000000Z"
+
+        payload = {
+            "method": "changeMode",
+            "params": [command]
+        }
+        self._log_request_details("POST", url, {}, payload)
+
+        try:
+            async with await self._request_with_auth_interceptor(
+                self._session.post,
+                url,
+                json=payload,
+                timeout=self._timeout
+            ) as response:
+                response.raise_for_status()
+                if 'application/json' in response.headers.get('Content-Type', ''):
+                    return await response.json()
+                return {}
+        except Exception as e:
+            _LOGGER.error("Error setting vacation mode: %s", str(e))
+            raise
 
     async def _request_with_auth_interceptor(self, request, url: str, **kwargs) -> aiohttp.ClientResponse:
         """Enhanced request with auth retry."""

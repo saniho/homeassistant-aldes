@@ -1,16 +1,16 @@
 {
   "domain": "aldes",
   "name": "Aldes",
-  "version": "v3.3.0",
-  "integration_type": "hub",
-  "documentation": "https://github.com/saniho/homeassistant-aldes",
-  "issue_tracker": "https://github.com/saniho/homeassistant-aldes/issues",
   "codeowners": [
     "@saniho"
   ],
   "config_flow": true,
+  "documentation": "https://github.com/saniho/homeassistant-aldes",
+  "integration_type": "hub",
   "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/saniho/homeassistant-aldes/issues",
   "requirements": [
     "backoff>=2.1.2"
-  ]
+  ],
+  "version": "v3.3.1"
 }
