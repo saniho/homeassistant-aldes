@@ -1,6 +1,7 @@
 {
   "domain": "aldes",
   "name": "Aldes",
+  "version": "v3.3.1",
   "codeowners": [
     "@saniho"
   ],
@@ -11,6 +12,5 @@
   "issue_tracker": "https://github.com/saniho/homeassistant-aldes/issues",
   "requirements": [
     "backoff>=2.1.2"
-  ],
-  "version": "v3.3.1"
+  ]
 }
