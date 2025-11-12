@@ -93,7 +93,7 @@ logger:
     custom_components.aldes: debug
 ```
 
-## <details><summary>Informations pour les développeurs</summary>
+## <details><summary>Informations pour les développeurs( informations non validées )</summary>
 
 ### Données API avancées : Le planning hebdomadaire
 
