@@ -21,3 +21,8 @@ set_vacation_dates:
       description: The end date and time of the vacation period. Leave empty to unset.
       selector:
         datetime:
+
+force_refresh:
+  name: Force Refresh
+  description: >-
+    Forces a refresh of the Aldes integration data.
