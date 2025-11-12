@@ -6,16 +6,16 @@ import logging
 import argparse
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Add the project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
-from custom_components.aldes.api import AldesApi
+from custom_components.aldes.api import AldesApi, AuthenticationException
 
 # Setup basic logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 _LOGGER = logging.getLogger(__name__)
 
 async def test_vacation_command(username: str, password: str, start_date_str: str | None, end_date_str: str | None, disable: bool):
@@ -26,12 +26,7 @@ async def test_vacation_command(username: str, password: str, start_date_str: st
         api = AldesApi(username, password, session)
 
         try:
-            # 1. Authenticate
-            _LOGGER.info("Authentification...")
-            await api.authenticate()
-            _LOGGER.info("\033[92m✓ Authentification réussie\033[0m")
-
-            # 2. Fetch data to get the modem ID
+            # 1. Fetch data to get the modem ID (authentication is automatic)
             _LOGGER.info("Récupération des données pour trouver l'ID de l'appareil...")
             products = await api.fetch_data()
             if not products:
@@ -46,20 +41,16 @@ async def test_vacation_command(username: str, password: str, start_date_str: st
             
             _LOGGER.info(f"Appareil trouvé avec l'ID: {modem_id}")
 
-            start_date_dt = None
-            end_date_dt = None
-
-            # 3. Prepare the command
+            # 2. Prepare and send the command
             if disable:
-                _LOGGER.info("Préparation de la commande pour DÉSACTIVER le mode vacances...")
-                # Dates are set to None, the API will handle sending a command for the past
-                start_date_dt = None
-                end_date_dt = None
+                _LOGGER.info("Envoi de la commande pour DÉSACTIVER le mode vacances...")
+                await api.set_away_mode(modem_id, enabled=False)
             elif start_date_str and end_date_str:
-                _LOGGER.info(f"Préparation de la commande pour ACTIVER le mode vacances du {start_date_str} au {end_date_str}...")
+                _LOGGER.info(f"Envoi de la commande pour ACTIVER le mode vacances du {start_date_str} au {end_date_str}...")
                 try:
                     start_date_dt = datetime.strptime(start_date_str, "%Y-%m-%d %H:%M:%S")
                     end_date_dt = datetime.strptime(end_date_str, "%Y-%m-%d %H:%M:%S")
+                    await api.set_away_mode(modem_id, enabled=True, start_date=start_date_dt, end_date=end_date_dt)
                 except ValueError:
                     _LOGGER.error("Format de date invalide. Utilisez 'YYYY-MM-DD HH:MM:SS'.")
                     return
@@ -67,14 +58,13 @@ async def test_vacation_command(username: str, password: str, start_date_str: st
                 _LOGGER.error("Vous devez soit utiliser --disable, soit fournir --start et --end.")
                 return
 
-            # 4. Send the command
-            _LOGGER.info("Envoi de la commande au serveur Aldes...")
-            await api.set_vacation_mode(modem_id, start_date_dt, end_date_dt)
             _LOGGER.info("\033[92m✓ Commande envoyée avec succès !\033[0m")
             _LOGGER.info("Veuillez vérifier l'état de votre appareil ou relancer test_api.py après quelques instants pour voir le changement.")
 
+        except AuthenticationException as e:
+            _LOGGER.error(f"\033[91m❌ Erreur d'authentification: {e.message}\033[0m")
         except Exception as e:
-            _LOGGER.error(f"\033[91m❌ Une erreur est survenue: {str(e)}\033[0m")
+            _LOGGER.error(f"\033[91m❌ Une erreur est survenue: {e}\033[0m", exc_info=True)
 
 def main():
     """Point d'entrée principal."""
