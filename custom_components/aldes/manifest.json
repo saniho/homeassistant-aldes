@@ -1,7 +1,7 @@
 {
   "domain": "aldes",
   "name": "Aldes",
-  "version": "v3.3.0",
+  "version": "v3.3.1",
   "integration_type": "hub",
   "documentation": "https://github.com/saniho/homeassistant-aldes",
   "issue_tracker": "https://github.com/saniho/homeassistant-aldes/issues",
@@ -12,5 +12,10 @@
   "iot_class": "cloud_polling",
   "requirements": [
     "backoff>=2.1.2"
+  ],
+  "domains": [
+    "binary_sensor",
+    "climate",
+    "sensor"
   ]
 }
