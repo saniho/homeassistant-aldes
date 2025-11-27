@@ -102,8 +102,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # Register the service to force refresh
     async def handle_force_refresh(call):
         """Handle the service call."""
-        _LOGGER.debug("Service call: Forcing refresh of Aldes data")
-        await coordinator.async_request_refresh()
+        _LOGGER.debug("Service call: Forcing refresh of Aldes data, bypassing cache")
+        await coordinator.async_force_refresh_data()
 
     hass.services.async_register(
         DOMAIN,

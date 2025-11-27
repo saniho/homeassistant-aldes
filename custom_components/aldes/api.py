@@ -172,11 +172,12 @@ class AldesApi:
                 raise
         return await _make_request()
 
-    async def fetch_data(self) -> Dict:
+    async def fetch_data(self, force_refresh: bool = False) -> Dict:
         """Fetch data with cache and retry."""
         cache_key = "products"
-        if cached_data := await self._get_cached_data(cache_key):
-            return cached_data
+        if not force_refresh:
+            if cached_data := await self._get_cached_data(cache_key):
+                return cached_data
 
         try:
             data = await self._api_request("get", API_URL_PRODUCTS)
