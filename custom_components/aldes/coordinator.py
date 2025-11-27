@@ -39,6 +39,13 @@ class AldesDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._failed_updates = 0
         self.health_status = True
 
+    def get_product(self, modem_id: str) -> dict[str, Any] | None:
+        """Get product data from coordinator data."""
+        return next(
+            (product for product in self.data if product.get("modem") == modem_id),
+            None,
+        )
+
     @backoff.on_exception(
         backoff.expo,
         (ClientError, TimeoutError),

@@ -98,6 +98,7 @@ class AldesClimateEntity(AldesEntity, ClimateEntity):
         """Return the state attributes of the climate entity."""
         attributes = super().extra_state_attributes or {}
         attributes["thermostat_id"] = self.thermostat_id
+        attributes["brand"] = "Aldes"
         return attributes
 
     @callback

@@ -1,153 +1,129 @@
 # Intégration Aldes pour Home Assistant
 
-Cette intégration permet de contrôler votre système Aldes depuis Home Assistant.
+[![HACS Badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
+[![GitHub release](https://img.shields.io/github/v/release/saniho/homeassistant-aldes)](https://github.com/saniho/homeassistant-aldes/releases/latest)
+
+Cette intégration permet de piloter votre système de chauffage et de rafraîchissement Aldes depuis Home Assistant.
 
 ## Avertissement
 
-Cette intégration est développée de manière indépendante et n'est pas officiellement soutenue par Aldes. L'auteur ne peut être tenu responsable de tout dysfonctionnement, dommage matériel ou perte de garantie résultant de l'utilisation de ce composant. Utilisez-le à vos propres risques.
+Cette intégration est un projet communautaire et n'est ni développée ni soutenue officiellement par Aldes. Son utilisation se fait à vos propres risques. L'auteur ne saurait être tenu responsable de tout dysfonctionnement ou dommage résultant de son usage.
+
+## Prérequis
+
+- Une installation fonctionnelle de Home Assistant.
+- Un système Aldes compatible (par exemple, T.One® AquaAir).
+- Vos identifiants pour l'application AldesConnect®.
 
 ## Installation
 
-### Méthode 1 : HACS (Home Assistant Community Store) - Recommandé
+### Méthode 1 : HACS (Recommandé)
 
-1.  Assurez-vous d'avoir [HACS](https://hacs.xyz/) installé.
-2.  Dans HACS, allez dans "Intégrations".
-3.  Cliquez sur les trois points en haut à droite et sélectionnez "Dépôts personnalisés".
-4.  Dans le champ "Dépôt", collez l'URL de ce dépôt GitHub.
-5.  Dans la catégorie, sélectionnez "Intégration".
-6.  Cliquez sur "Ajouter".
-7.  Vous devriez maintenant voir l'intégration "Aldes". Cliquez sur "Installer".
-8.  Redémarrez Home Assistant.
+1.  Si ce n'est pas déjà fait, installez [HACS](https://hacs.xyz/).
+2.  Dans HACS, allez dans **Intégrations**.
+3.  Cliquez sur les trois points en haut à droite et sélectionnez **"Dépôts personnalisés"**.
+4.  Collez l'URL de ce dépôt (`https://github.com/saniho/homeassistant-aldes`) dans le champ "Dépôt".
+5.  Sélectionnez la catégorie **"Intégration"**.
+6.  Cliquez sur **"Ajouter"**, puis trouvez et installez l'intégration Aldes.
+7.  Redémarrez Home Assistant pour finaliser l'installation.
 
 ### Méthode 2 : Manuelle
 
-1.  Copiez le dossier `custom_components/aldes` dans le dossier `custom_components` de votre installation Home Assistant.
-2.  Redémarrez Home Assistant.
+1.  Téléchargez la dernière version depuis la page [Releases](https://github.com/saniho/homeassistant-aldes/releases/latest).
+2.  Copiez le dossier `custom_components/aldes` dans le dossier `custom_components` de votre Home Assistant.
+3.  Redémarrez Home Assistant.
 
-### Configuration de l'intégration
-
-Une fois l'installation terminée :
+## Configuration
 
 1.  Allez dans **Paramètres > Appareils et services**.
-2.  Cliquez sur **"Ajouter une intégration"**.
-3.  Recherchez **"Aldes"**.
-4.  Entrez vos identifiants Aldes (email et mot de passe).
-
-## Fonctionnalités
-
-L'intégration vous permet de visualiser et de contrôler de nombreux aspects de votre système Aldes :
-
-### Consultation
-- **État général** : Visualisez l'état de la connexion, la température principale du système et la quantité d'eau chaude restante.
-- **Modes actuels** : Suivez le mode de fonctionnement de l'air (Chauffage, Refroidissement, Auto, etc.) et de l'eau.
-- **Thermostats individuels** : Consultez la température actuelle et la température de consigne pour chaque pièce.
-- **Modes spéciaux** : Sachez si le mode "hors gel" ou le mode "vacances" est actuellement actif.
-
-### Contrôle
-- **Température** : Ajustez la température de consigne pour chaque thermostat individuellement.
-- **Mode de fonctionnement** : Changez le mode principal de l'appareil (Chauffage, Refroidissement, Auto, Arrêt).
-- **Mode vacances (Bêta)** : Activez ou désactivez le mode vacances via un interrupteur, ou programmez une période de vacances personnalisée grâce à un service dédié.
-- **Mode hors gel (Bêta)** : Activez ou désactivez la protection hors gel via un interrupteur.
+2.  Cliquez sur **"Ajouter une intégration"** et recherchez **"Aldes"**.
+3.  Suivez les instructions à l'écran pour entrer vos identifiants Aldes (email et mot de passe).
 
 ## Entités créées
 
-L'intégration crée un appareil Aldes dans Home Assistant, qui contient plusieurs entités :
+L'intégration crée un appareil Aldes qui regroupe les entités suivantes :
 
-- **Climate** : Une entité pour chaque thermostat, permettant de contrôler la température et le mode.
-- **Sensor** : Capteurs pour la température principale, le niveau d'eau chaude, les modes, etc.
-- **Binary Sensor** : Capteurs pour l'état de la connexion, le mode vacances et le mode hors gel.
+- **Climate** : Une entité par zone/thermostat pour contrôler la température et le mode (ex: `climate.salon`).
+- **Sensor** :
+    - Température principale du système (`sensor.aldes_main_temperature`).
+    - Quantité d'eau chaude sanitaire (`sensor.aldes_hot_water_quantity`).
+    - Mode de fonctionnement de l'air (`sensor.aldes_air_mode`).
+- **Binary Sensor** :
+    - État de la connexion au cloud Aldes (`binary_sensor.aldes_connectivity`).
+    - Indicateur du mode vacances (`binary_sensor.aldes_vacation_mode`).
+    - Indicateur du mode hors gel (`binary_sensor.aldes_away_mode`).
 - **Switch** :
-    - Un interrupteur pour activer/désactiver le mode vacances. **(Fonctionnalité en Bêta)**
-    - Un interrupteur pour activer/désactiver le mode hors gel. **(Fonctionnalité en Bêta)**
+    - Interrupteur pour le mode vacances (`switch.aldes_vacation_mode`). **(Bêta)**
+    - Interrupteur pour le mode hors gel (`switch.aldes_away_mode`). **(Bêta)**
 
 ## Services
 
 ### Service `aldes.set_vacation_dates`
 
-Ce service vous permet de définir une période de vacances personnalisée. L'interface est accessible via **Outils de développement > Services**.
+Ce service permet de programmer une période de vacances.
 
-**Note :** La prise en compte de la commande par l'appareil peut prendre quelques minutes.
+- **Paramètres :**
+    - `device_id`: (Obligatoire) Votre appareil Aldes.
+    - `start_date`: (Optionnel) Date de début des vacances (`YYYY-MM-DD HH:MM:SS`).
+    - `end_date`: (Optionnel) Date de fin des vacances (`YYYY-MM-DD HH:MM:SS`).
 
-#### Paramètres
+- **Exemple :**
+    ```yaml
+    service: aldes.set_vacation_dates
+    data:
+      device_id: VOTRE_DEVICE_ID
+      start_date: "2024-12-20 08:00:00"
+      end_date: "2024-12-27 18:00:00"
+    ```
 
-- **Device** : (Obligatoire) Un menu déroulant pour choisir votre appareil Aldes.
-- **Start Date** : (Optionnel) La date et l'heure de début des vacances.
-- **End Date** : (Optionnel) La date et l'heure de fin des vacances.
-
-#### Exemples d'utilisation
-
-**Pour activer le mode vacances du 20 au 27 décembre 2024 :**
-
-```yaml
-service: aldes.set_vacation_dates
-data:
-  device_id: VOTRE_DEVICE_ID
-  start_date: "2024-12-20 08:00:00"
-  end_date: "2024-12-27 18:00:00"
-```
-
-**Pour désactiver le mode vacances :**
-
-Laissez les champs `start_date` et `end_date` vides.
-
-```yaml
-service: aldes.set_vacation_dates
-data:
-  device_id: VOTRE_DEVICE_ID
-```
-
-## Données API avancées : Le planning hebdomadaire
-
-L'API Aldes expose les données du planning hebdomadaire via les clés `week_planning` et `week_planning4`. Ces données sont une liste de commandes qui définissent le mode de fonctionnement pour chaque heure de la semaine.
-
-### Structure des commandes
-
-Chaque commande a un format de 3 caractères, par exemple `71B` :
-
-- **Premier caractère (`7`)** : Représente le jour de la semaine (probablement `0` pour Lundi, `1` pour Mardi, etc., jusqu'à `6` pour Dimanche).
-- **Deuxième caractère (`1`)** : Représente un bloc horaire dans la journée.
-- **Troisième caractère (`B`)** : Représente le mode à activer.
-
-### Modes connus
-
-En se basant sur le code de l'intégration et les données de l'API, voici les modes que nous pouvons déduire :
-
-- `A` : Off
-- `B` : Heat (Chauffage)
-- `C` : (Mode inconnu, probablement un mode "confort" ou "éco")
-- `E` : Auto
-- `F` : Cool (Refroidissement)
-- `G` à `N` : Autres modes (probablement des variations de "confort", "éco", ou des modes spécifiques à l'eau chaude).
-
-**Note :** Pour le moment, l'intégration ne permet pas de modifier ce planning. Ces informations sont fournies à titre indicatif et pourraient servir de base pour de futures fonctionnalités.
+- **Pour annuler**, appelez le service sans les dates de début et de fin.
 
 ## Dépannage
 
-En cas de problème de connexion :
-1. Vérifiez vos identifiants.
-2. Assurez-vous que vous pouvez vous connecter à l'application mobile officielle Aldes.
-3. Vérifiez les logs de Home Assistant pour plus de détails (Paramètres > Système > Journaux).
+Si vous rencontrez des problèmes :
+1.  Vérifiez que vos identifiants sont corrects et fonctionnent dans l'application officielle.
+2.  Consultez les journaux de Home Assistant (**Paramètres > Système > Journaux**).
 
-## Scripts de Test
+Pour obtenir des logs plus détaillés, ajoutez ceci à votre fichier `configuration.yaml` :
 
-Des scripts de test sont fournis pour vérifier les fonctionnalités de l'API en dehors de Home Assistant.
+```yaml
+logger:
+  default: info
+  logs:
+    custom_components.aldes: debug
+```
 
-### Test général de l'API
+## <details><summary>Informations pour les développeurs( informations non validées )</summary>
 
-```bash
+### Données API avancées : Le planning hebdomadaire
+
+L'API Aldes expose les données du planning hebdomadaire via les clés `week_planning` et `week_planning4`. Ces données sont une liste de commandes qui définissent le mode de fonctionnement pour chaque heure de la semaine.
+
+**Structure des commandes**
+
+Chaque commande a un format de 3 caractères, par exemple `71B` :
+- **Premier caractère (`7`)** : Jour de la semaine.
+- **Deuxième caractère (`1`)** : Bloc horaire.
+- **Troisième caractère (`B`)** : Mode à activer (`A`: Off, `B`: Heat, `E`: Auto, `F`: Cool, etc.).
+
+**Note :** L'intégration ne permet pas de modifier ce planning pour le moment.
+
+### Scripts de Test
+
+Des scripts de test sont fournis pour interagir avec l'API en dehors de Home Assistant.
+
+**Test général de l'API**
+```sh
 python scripts/test_api.py votre_email votre_mot_de_passe
 ```
 
-### Test du mode vacances
+**Test du mode vacances**
+```sh
+# Activer
+python scripts/test_vacation_mode.py email pass --start "YYYY-MM-DD HH:MM:SS" --end "YYYY-MM-DD HH:MM:SS"
 
-Ce script permet d'activer ou de désactiver le mode vacances.
-
-**Pour activer :**
-```bash
-python scripts/test_vacation_mode.py votre_email votre_mot_de_passe --start "AAAA-MM-JJ HH:MM:SS" --end "AAAA-MM-JJ HH:MM:SS"
+# Désactiver
+python scripts/test_vacation_mode.py email pass --disable
 ```
 
-**Pour désactiver :**
-```bash
-python scripts/test_vacation_mode.py votre_email votre_mot_de_passe --disable
-```
+</details>

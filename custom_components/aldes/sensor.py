@@ -1,6 +1,7 @@
 """Support for the Aldes sensors."""
 from __future__ import annotations
 import logging
+from typing import Final
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -9,18 +10,19 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, UnitOfTemperature
+from homeassistant.const import PERCENTAGE, UnitOfTemperature, UnitOfPressure, UnitOfPower
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .coordinator import AldesDataUpdateCoordinator
 from .entity import AldesEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 # Describes the sensors that are not thermostats
-PRODUCT_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
+PRODUCT_SENSOR_DESCRIPTIONS: Final[tuple[SensorEntityDescription, ...]] = (
     SensorEntityDescription(
         key="qte_eau_chaude",
         name="Hot Water Level",
@@ -59,65 +61,83 @@ PRODUCT_SENSOR_DESCRIPTIONS: tuple[SensorEntityDescription, ...] = (
     ),
 )
 
+THERMOSTAT_SENSOR_DESCRIPTIONS: Final[tuple[SensorEntityDescription, ...]] = (
+    SensorEntityDescription(
+        key="CurrentTemperature",
+        name="Temperature",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="CurrentHumidity",
+        name="Humidity",
+        native_unit_of_measurement=PERCENTAGE,
+        device_class=SensorDeviceClass.HUMIDITY,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Add Aldes sensors from a config_entry."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator: AldesDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
     _LOGGER.debug("Starting sensor setup")
 
     sensors: list[SensorEntity] = []
+    # Prevent creating entities for the same modem_id multiple times
+    processed_modem_ids = set()
+
     for product in coordinator.data:
         modem_id = product.get("modem")
-        # Prevent creation of entities with invalid ID
-        if not modem_id or modem_id == "N/A":
-            _LOGGER.warning("Skipping product with invalid modem ID: %s", modem_id)
+        if not modem_id or modem_id == "N/A" or modem_id in processed_modem_ids:
+            if modem_id in processed_modem_ids:
+                _LOGGER.debug("Skipping already processed modem ID: %s", modem_id)
+            else:
+                _LOGGER.warning("Skipping product with invalid modem ID: %s", modem_id)
             continue
-
-        _LOGGER.debug(f"Setting up sensors for product with modem ID: {modem_id}")
+        
+        processed_modem_ids.add(modem_id)
+        _LOGGER.debug("Setting up sensors for product with modem ID: %s", modem_id)
 
         indicator_data = product.get("indicator")
         if not indicator_data:
+            _LOGGER.debug("No indicator data for modem ID: %s", modem_id)
             continue
 
         # --- Product Sensors ---
-        known_keys = {desc.key for desc in PRODUCT_SENSOR_DESCRIPTIONS}
         for description in PRODUCT_SENSOR_DESCRIPTIONS:
             if description.key in indicator_data and indicator_data[description.key] is not None:
-                _LOGGER.debug(f"Creating sensor '{description.name}' for {modem_id}")
                 sensors.append(
                     AldesProductSensor(coordinator, entry, modem_id, product, description)
                 )
 
         # --- Settings Sensor ---
         if "settings" in indicator_data:
-            _LOGGER.debug(f"Creating sensor 'Aldes Settings' for {modem_id}")
             sensors.append(AldesSettingsSensor(coordinator, entry, modem_id, product))
 
         # --- Thermostat Sensors ---
         if isinstance(indicator_data.get("thermostats"), list):
             for thermostat in indicator_data["thermostats"]:
                 thermostat_id = thermostat.get("thermostatId")
-                if thermostat_id:
-                    thermostat_name = thermostat.get("Name") or f"Thermostat {thermostat_id}"
-                    _LOGGER.debug(f"Creating thermostat sensor '{thermostat_name}' for {modem_id}")
-                    sensors.append(
-                        AldesThermostatSensor(coordinator, entry, modem_id, product, thermostat)
-                    )
-
-        # --- Log unhandled indicators ---
-        for key, value in indicator_data.items():
-            if key not in known_keys and key != "settings" and not isinstance(value, (dict, list)):
-                _LOGGER.debug(
-                    f"Unhandled indicator key found for {modem_id}: '{key}' with value: {value}. "
-                    "Consider adding a sensor for it."
-                )
+                if not thermostat_id:
+                    _LOGGER.warning("Skipping thermostat with no ID for modem %s", modem_id)
+                    continue
+                
+                for description in THERMOSTAT_SENSOR_DESCRIPTIONS:
+                    if description.key in thermostat:
+                        sensors.append(
+                            AldesThermostatSensor(
+                                coordinator, entry, modem_id, product, thermostat, description
+                            )
+                        )
 
     if not sensors:
         _LOGGER.warning("No sensors were created. Check API data and integration logic.")
     else:
-        _LOGGER.debug(f"Adding {len(sensors)} sensors to Home Assistant")
+        _LOGGER.info("Adding %s Aldes sensors", len(sensors))
 
     async_add_entities(sensors)
 
@@ -129,10 +149,10 @@ class AldesProductSensor(AldesEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator,
-        config_entry,
-        modem_id,
-        product,
+        coordinator: AldesDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        modem_id: str,
+        product: dict,
         description: SensorEntityDescription,
     ):
         """Initialize the sensor."""
@@ -149,24 +169,19 @@ class AldesProductSensor(AldesEntity, SensorEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        product_data = next(
-            (p for p in self.coordinator.data if p.get("modem") == self.modem),
-            None,
-        )
+        product_data = self.coordinator.get_product(self.modem)
         
         if (
             product_data
             and product_data.get("isConnected")
-            and product_data.get("indicator")
+            and (indicator_data := product_data.get("indicator"))
         ):
-            value = product_data["indicator"].get(self.entity_description.key)
-            # Reformat datetime string for timestamp sensors
+            value = indicator_data.get(self.entity_description.key)
             if self.entity_description.device_class == SensorDeviceClass.TIMESTAMP and isinstance(value, str):
                 try:
-                    # Input: "2025-11-06 10:31:12Z" -> Output: datetime object
                     self._attr_native_value = dt_util.parse_datetime(value.replace(" ", "T"))
                 except (ValueError, TypeError):
-                    self._attr_native_value = None # Don't set invalid date
+                    self._attr_native_value = None
             else:
                 self._attr_native_value = value
         else:
@@ -180,10 +195,10 @@ class AldesSettingsSensor(AldesEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator,
-        config_entry,
-        modem_id,
-        product,
+        coordinator: AldesDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        modem_id: str,
+        product: dict,
     ):
         """Initialize the sensor."""
         super().__init__(
@@ -196,25 +211,17 @@ class AldesSettingsSensor(AldesEntity, SensorEntity):
         self._attr_unique_id = f"{DOMAIN}_{modem_id}_settings"
         self._attr_name = "Aldes Settings"
         self._attr_icon = "mdi:account-group"
-        self._attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
-    def extra_state_attributes(self):
+    def extra_state_attributes(self) -> dict:
         """Return the state attributes."""
         attributes = super().extra_state_attributes or {}
-        product_data = next(
-            (p for p in self.coordinator.data if p.get("modem") == self.modem),
-            None,
-        )
+        product_data = self.coordinator.get_product(self.modem)
 
-        if (
-            product_data
-            and product_data.get("indicator")
-            and "settings" in product_data["indicator"]
-        ):
-            attributes.update(product_data["indicator"]["settings"])
+        if product_data and (indicator_data := product_data.get("indicator")):
+            if "settings" in indicator_data:
+                attributes.update(indicator_data["settings"])
         
-        # Add the device_id to make service calls easier
         if self.registry_entry and self.registry_entry.device_id:
             attributes["device_id"] = self.registry_entry.device_id
             
@@ -223,24 +230,19 @@ class AldesSettingsSensor(AldesEntity, SensorEntity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        product_data = next(
-            (p for p in self.coordinator.data if p.get("modem") == self.modem),
-            None,
-        )
+        product_data = self.coordinator.get_product(self.modem)
         
         if (
             product_data
             and product_data.get("isConnected")
-            and product_data.get("indicator")
-            and "settings" in product_data["indicator"]
+            and (indicator_data := product_data.get("indicator"))
+            and "settings" in indicator_data
         ):
-            people = product_data["indicator"]["settings"].get("people")
+            people = indicator_data["settings"].get("people")
             if people is not None:
                 try:
-                    # Add 2 to the value from the API
                     self._attr_native_value = int(people) + 2
                 except (ValueError, TypeError):
-                    # If for some reason it's not a number, just show the original value
                     self._attr_native_value = people
             else:
                 self._attr_native_value = None
@@ -253,13 +255,16 @@ class AldesSettingsSensor(AldesEntity, SensorEntity):
 class AldesThermostatSensor(AldesEntity, SensorEntity):
     """Define an Aldes thermostat sensor."""
 
+    entity_description: SensorEntityDescription
+
     def __init__(
         self,
-        coordinator,
-        config_entry,
-        modem_id,
-        product,
-        thermostat,
+        coordinator: AldesDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+        modem_id: str,
+        product: dict,
+        thermostat: dict,
+        description: SensorEntityDescription,
     ):
         """Initialize the sensor."""
         super().__init__(
@@ -269,40 +274,33 @@ class AldesThermostatSensor(AldesEntity, SensorEntity):
             product.get("reference"),
             modem_id,
         )
-        self.thermostat = thermostat
+        self.entity_description = description
         self.thermostat_id = thermostat["thermostatId"]
         
-        self._attr_device_class = SensorDeviceClass.TEMPERATURE
-        self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_unique_id = f"{DOMAIN}_{self.thermostat_id}_temperature"
-        
-        thermostat_name = self.thermostat.get("Name") or f"Thermostat {self.thermostat_id}"
-        self._attr_name = f"{thermostat_name} Temperature"
+        thermostat_name = thermostat.get("Name") or f"Thermostat {self.thermostat_id}"
+        self._attr_name = f"{thermostat_name} {description.name}"
+        self._attr_unique_id = f"{DOMAIN}_{self.thermostat_id}_{description.key}"
 
     @callback
     def _handle_coordinator_update(self) -> None:
         """Update attributes when the coordinator updates."""
-        product_data = next(
-            (p for p in self.coordinator.data if p.get("modem") == self.modem),
-            None,
-        )
+        product_data = self.coordinator.get_product(self.modem)
+        thermostat_data = None
 
         if (
             product_data
             and product_data.get("isConnected")
-            and product_data.get("indicator")
-            and isinstance(product_data["indicator"].get("thermostats"), list)
+            and (indicator_data := product_data.get("indicator"))
+            and isinstance(indicator_data.get("thermostats"), list)
         ):
             thermostat_data = next(
-                (t for t in product_data["indicator"]["thermostats"] if t.get("thermostatId") == self.thermostat_id),
+                (t for t in indicator_data["thermostats"] if t.get("thermostatId") == self.thermostat_id),
                 None,
             )
-            
-            if thermostat_data and "CurrentTemperature" in thermostat_data:
-                self._attr_native_value = round(thermostat_data["CurrentTemperature"], 1)
-            else:
-                self._attr_native_value = None
+        
+        if thermostat_data and self.entity_description.key in thermostat_data:
+            value = thermostat_data[self.entity_description.key]
+            self._attr_native_value = round(value, 1) if isinstance(value, (int, float)) else value
         else:
             self._attr_native_value = None
 

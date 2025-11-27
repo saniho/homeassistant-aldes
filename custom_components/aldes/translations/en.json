@@ -16,5 +16,11 @@
         "abort": {
             "single_instance_allowed": "Only a single instance is allowed."
         }
+    },
+    "services": {
+        "force_refresh": {
+            "name": "Force Refresh",
+            "description": "Forces a refresh of the Aldes integration data."
+        }
     }
 }

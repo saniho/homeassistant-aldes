@@ -27,5 +27,11 @@
                 }
             }
         }
+    },
+    "services": {
+        "force_refresh": {
+            "name": "Forcer le rafraîchissement",
+            "description": "Force le rafraîchissement des données de l'intégration Aldes."
+        }
     }
 }

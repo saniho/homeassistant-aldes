@@ -22,6 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # Service definitions
 SERVICE_SET_VACATION_DATES = "set_vacation_dates"
+SERVICE_FORCE_REFRESH = "force_refresh"
 ATTR_DEVICE_ID = "device_id"
 ATTR_START_DATE = "start_date"
 ATTR_END_DATE = "end_date"
@@ -96,6 +97,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         SERVICE_SET_VACATION_DATES,
         handle_set_vacation_dates,
         schema=SERVICE_SET_VACATION_DATES_SCHEMA,
+    )
+
+    # Register the service to force refresh
+    async def handle_force_refresh(call):
+        """Handle the service call."""
+        _LOGGER.debug("Service call: Forcing refresh of Aldes data")
+        await coordinator.async_request_refresh()
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_FORCE_REFRESH,
+        handle_force_refresh,
     )
 
     return True
