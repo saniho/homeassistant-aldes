@@ -75,3 +75,14 @@ class AldesDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # L'API gère maintenant son propre cache, on laisse remonter l'erreur
             # si elle ne peut pas fournir de données cachées
             raise UpdateFailed(exception) from exception
+
+    async def async_force_refresh_data(self) -> None:
+        """Force a refresh of the data, bypassing the cache."""
+        _LOGGER.debug("Forcing data refresh, bypassing cache.")
+        try:
+            async with async_timeout.timeout(self.api._REQUEST_TIMEOUT):
+                data = await self.api.fetch_data(force_refresh=True)
+                self.async_set_updated_data(data)
+        except Exception as exception:
+            _LOGGER.error("Forced refresh failed: %s", exception)
+            raise UpdateFailed(exception) from exception

@@ -93,8 +93,9 @@ async def test_api(username: str, password: str):
                     if thermostats:
                         _LOGGER.info("\n  [4mThermostats:[0m")
                         for th in thermostats:
+                            thermostat_id = th.get('ThermostatId', 'N/A')
                             name = th.get("Name") or f"Thermostat {th.get('Number')}"
-                            _LOGGER.info(f"    - {name}: {th.get('CurrentTemperature', 'N/A')}°C (Consigne: {th.get('TemperatureSet', 'N/A')}°C)")
+                            _LOGGER.info(f"    - {name} (ID: {thermostat_id}): {th.get('CurrentTemperature', 'N/A')}°C (Consigne: {th.get('TemperatureSet', 'N/A')}°C)")
             
             _LOGGER.info("\n\033[92m✓ Tests terminés avec succès!\033[0m")
 
